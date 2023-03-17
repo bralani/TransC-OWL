@@ -240,9 +240,9 @@ public class reasoner {
 
     public void generateInstanceOf() {
         ArrayList<String> out=new ArrayList<String>();
-        ArrayList<Statement> l = getStatements(schema, null,RDF.type, null);
+        ArrayList<Statement> l = getStatements(data, null,RDF.type, null);
         for(Statement i : l) {
-            out.add("<" + i.getSubject() + "> <" + i.getObject().asResource() + ">");
+            out.add("<" + i.getSubject() + "> <" + i.getObject() + ">");
         }
 
         try {
@@ -449,6 +449,9 @@ public class reasoner {
             db_classes.add(i.getSubject().asResource());
         }
         int k=0;
+
+        String totale = Integer.toString(db_classes.size());
+        out.add(totale);
         for(Resource j : db_classes){
             out.add("<" + j + "> " + k);
             k++;

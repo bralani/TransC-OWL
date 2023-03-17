@@ -1,2 +1,0 @@
-<http://dbpedia.org/ontology/playerInTeam>	<http://dbpedia.org/ontology/team>
-<http://dbpedia.org/ontology/influenced>	<http://dbpedia.org/ontology/influencedBy>
