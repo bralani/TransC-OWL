@@ -48,8 +48,6 @@ list<int> functionalRel;
 map<int, int> inverse;
 map<int, int> equivalentRel;
 // map<int,int> disjointWith;
-multimap<int, int> equivalentClass;
-map<int, int> entsubclass;
 int typeOf_id;
 INT trainSize, tripleTotal;
 
@@ -185,57 +183,6 @@ int getEquivalentProperty(int rel)
 		return equivalentRel.find(rel)->second;
 	else
 		return -1;
-}
-
-set<int> getEquivalentClass(int id_class)
-{
-	set<int> cls;
-	pair<std::multimap<int, int>::iterator, multimap<int, int>::iterator> ret;
-	ret = equivalentClass.equal_range(id_class);
-	for (multimap<int, int>::iterator it = ret.first; it != ret.second; ++it)
-		cls.insert(it->second);
-	return cls;
-}
-
-void getSubclass()
-{
-	multimap<int, int> sub2superclass; // mappa id in id della superclasse
-	ifstream subclass_file(inPath + "subclassID.txt");
-	string tmp;
-	while (getline(subclass_file, tmp))
-	{
-		string::size_type pos = tmp.find('\t', 0);
-		int id_subclass = atoi(tmp.substr(0, pos).c_str());
-		int id_superclass = atoi(tmp.substr(pos + 1).c_str());
-		sub2superclass.insert(pair<int, int>(id_subclass, id_superclass));
-	}
-	subclass_file.close();
-
-	ifstream todbp_file(inPath + "todbpedia.txt");
-	map<int, int> ent2cls;
-	map<int, int> cls2ent;
-	while (getline(todbp_file, tmp))
-	{
-		string::size_type pos = tmp.find('\t', 0);
-		int entity = atoi(tmp.substr(0, pos).c_str());
-		int dbp_class = atoi(tmp.substr(pos + 1).c_str());
-		cls2ent.insert(pair<int, int>(dbp_class, entity));
-		ent2cls.insert(pair<int, int>(entity, dbp_class));
-	}
-	todbp_file.close();
-
-	for (map<int, int>::iterator it = ent2cls.begin(); it != ent2cls.end(); ++it)
-	{
-		int entity = it->first;
-		int dbp_class = it->second;
-		pair<std::multimap<int, int>::iterator, multimap<int, int>::iterator> ret;
-		ret = sub2superclass.equal_range(dbp_class); // restituisce tutti i valori con chiave=id_dbpedia
-		for (multimap<int, int>::iterator it = ret.first; it != ret.second; ++it)
-		{
-			if (cls2ent.find(it->second) != cls2ent.end())
-				entsubclass.insert(pair<int, int>(entity, cls2ent.find(it->second)->second));
-		}
-	}
 }
 
 // read owl information from files prepared using DBPedia OWL (see dbpediaUtils)
@@ -412,26 +359,6 @@ void owlInit()
 	}
 	eqProp_file.close();
 
-	ifstream eqClass_file(inPath + "equivalentClass.txt");
-	while (getline(eqClass_file, tmp))
-	{
-		string::size_type pos = tmp.find(' ', 0);
-		string first = tmp.substr(0, pos);
-		if (ent2id.find(first) != ent2id.end())
-		{
-			string second = tmp.substr(pos + 1);
-			second = second.substr(0, second.length());
-			if (ent2id.find(second) != ent2id.end())
-			{
-				int id_first = ent2id.find(first)->second;
-				int id_second = ent2id.find(second)->second;
-				equivalentClass.insert(pair<int, int>(id_first, id_second));
-				equivalentClass.insert(pair<int, int>(id_second, id_first));
-			}
-		}
-	}
-	eqClass_file.close();
-
 	multimap<int, int> dbp_disj;
 	ifstream disj_file(inPath + "disjoint2id.txt");
 	while (getline(disj_file, tmp))
@@ -442,8 +369,6 @@ void owlInit()
 		dbp_disj.insert(pair<int, int>(cls, disjoint));
 	}
 	disj_file.close();
-
-	getSubclass();
 }
 
 /*
@@ -1036,33 +961,6 @@ void gradientSubClassOf(int c1_a, int c2_a, int c1_b, int c2_b)
 }
 */
 
-void gradientSubClass(INT cls1_a, INT cls2_a, INT cls1_b, INT cls2_b)
-{
-	INT lasta1 = cls1_a * dimension;
-	INT lasta2 = cls2_a * dimension;
-	INT lastb1 = cls1_b * dimension;
-	INT lastb2 = cls2_b * dimension;
-	// se entità equivalenti, salva array
-	for (INT ii = 0; ii < dimension; ii++)
-	{
-		REAL x;
-		x = 2 * (entityVec[lasta2 + ii] - entityVec[lasta1 + ii]);
-		if (x > 0)
-			x = -alpha;
-		else
-			x = alpha;
-		entityVec[lasta1 + ii] -= x;
-		entityVec[lasta2 + ii] += x;
-		x = 2 * (entityVec[lastb2 + ii] - entityVec[lastb1 + ii]);
-		if (x > 0)
-			x = alpha;
-		else
-			x = -alpha;
-		entityVec[lastb1 + ii] -= x;
-		entityVec[lastb2 + ii] += x;
-	}
-}
-
 void gradientInverseOf(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b, INT inverseRel)
 {
 	INT lasta1 = e1_a * dimension;
@@ -1157,89 +1055,6 @@ int getFalseClass(int entity)
 	return j;
 }
 
-void gradientEquivalentClass(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b, INT id)
-{
-	INT lasta1 = e1_a * dimension;
-	INT lasta2 = e2_a * dimension;
-	INT lastar = rel_a * dimension;
-	INT lastb1 = e1_b * dimension;
-	INT lastb2 = e2_b * dimension;
-	INT lastbr = rel_b * dimension;
-	vector<int> corr_tails;
-	vector<int> corr_heads;
-	set<int> eq_cls = getEquivalentClass(e2_a);
-
-	for (set<int>::iterator it = eq_cls.begin(); it != eq_cls.end(); ++it)
-	{
-		int tail = getFalseClass(e1_a);
-		if (tail == -1)
-			tail = corrupt_head(id, e1_a, rel_a);
-		int head = corrupt_tail(id, e2_a, rel_a);
-		corr_tails.push_back(tail);
-		corr_heads.push_back(head);
-	}
-
-	// se entità equivalenti, salva array
-	for (INT ii = 0; ii < dimension; ii++)
-	{
-		REAL x;
-		x = (entityVec[lasta2 + ii] - entityVec[lasta1 + ii] - relationVec[lastar + ii]);
-		if (x > 0)
-			x = -alpha;
-		else
-			x = alpha;
-		int pos_x = x;
-		relationVec[lastar + ii] -= x;
-		entityVec[lasta1 + ii] -= x;
-		entityVec[lasta2 + ii] += x;
-		x = (entityVec[lastb2 + ii] - entityVec[lastb1 + ii] - relationVec[lastbr + ii]);
-		if (x > 0)
-			x = alpha;
-		else
-			x = -alpha;
-		int neg_x = x;
-		relationVec[lastbr + ii] -= x;
-		entityVec[lastb1 + ii] -= x;
-		entityVec[lastb2 + ii] += x;
-
-		if (eq_cls.size() > 0)
-		{
-			int i = 0;
-			for (set<int>::iterator it = eq_cls.begin(); it != eq_cls.end(); ++it)
-			{
-				INT lastCls = (*it) * dimension;
-				relationVec[lastar + ii] -= pos_x;
-				entityVec[lasta1 + ii] -= pos_x;
-				entityVec[lastCls + ii] += pos_x;
-
-				uint pr;
-				if (bernFlag)
-					pr = 1000 * right_mean[rel_a] / (right_mean[rel_a] + left_mean[rel_a]);
-				else
-					pr = 500;
-
-				if (randd(id) % 1000 < pr)
-				{
-					int tail = corr_tails[i];
-					INT last_tail = tail * dimension;
-					relationVec[lastbr + ii] -= neg_x;
-					entityVec[lastb1 + ii] -= neg_x;
-					entityVec[last_tail + ii] += neg_x;
-				}
-				else
-				{
-					int head = corr_heads[i];
-					INT last_head = head * dimension;
-					relationVec[lastbr + ii] -= neg_x;
-					entityVec[last_head + ii] -= neg_x;
-					entityVec[lastb2 + ii] += neg_x;
-				}
-				i++;
-			}
-		}
-	}
-}
-
 void train_kb(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b, INT id)
 {
 	if (isInstanceOf(rel_a))
@@ -1258,11 +1073,7 @@ void train_kb(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b, INT 
 	if (sum1 + margin > sum2)
 	{
 		res += margin + sum1 - sum2;
-		if (rel_a == typeOf_id)
-		{
-			gradientEquivalentClass(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b, id);
-		}
-		else if (getInverse(rel_a) != -1)
+		if (getInverse(rel_a) != -1)
 		{
 			gradientInverseOf(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b, getInverse(rel_a));
 		}
@@ -1273,10 +1084,6 @@ void train_kb(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b, INT 
 		else
 		{
 			gradient(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b);
-		}
-		if (rel_a == typeOf_id && entsubclass.find(e2_a) != entsubclass.end())
-		{
-			gradientSubClass(e2_a, entsubclass.find(e2_a)->second, e2_a, e2_b);
 		}
 	}
 }
@@ -1369,9 +1176,6 @@ int train(int triple_index, int id)
 		pr = 500;
 	if (randd(id) % 1000 < pr || isFunctional(trainList[triple_index].r))
 	{
-		//		if(trainList[triple_index].r == typeOf_id) {
-		//			j = getFalseClass(trainList[triple_index].h);
-		//		} else
 		if (hasRange(trainList[triple_index].r))
 		{
 			j = getTailCorrupted(triple_index, id);
