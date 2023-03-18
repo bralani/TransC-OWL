@@ -1,3 +1,4 @@
+
 #define REAL float
 #define INT int
 
@@ -14,47 +15,27 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
-
 #include <map>
 #include <fstream>
 #include <list>
 #include <set>
 #include <vector>
+
+#include "math.h"
+#include "globals.h"
+
 using namespace std;
 
 void out();
 
-const REAL pi = 3.141592653589793238462643383;
-
-INT threads = 12;
-INT bernFlag = 1;
-INT loadBinaryFlag = 0;
-INT outBinaryFlag = 0;
-INT trainTimes = 1000; // epoch - 1000
-INT nbatches = 50;		 // batches - 50/100
-INT dimension = 100;
-REAL alpha = 0.001;
-REAL margin = 1.0;
-REAL margin_instance = 0.4;
-REAL margin_subclass = 0.3;
-REAL RATE = 0.001;
-
-int failed = 0;
-int tot_batches = 0;
-int wrong = 0;
-
-string inPath = "Train/";
-string outPath = "Output/";
-string loadPath = "";
-string note = "_OWL";
 
 INT *lefHead, *rigHead;
 INT *lefTail, *rigTail;
 
 // OWL Variable
-multimap<INT, INT> ent2class;		// mapppa una entità nella classe di appartenzenza (se disponibile) id dbpedia
-multimap<INT, INT> ent2cls;			// mappa una entità alla classe di appartenenza (per range e domain)
-multimap<INT, INT> rel2range;		// mappa una relazione nel range, che corrisponde ad una classe
+multimap<INT, INT> ent2class;	// mappa una entità nella classe di appartenzenza (se disponibile) id dbpedia
+multimap<INT, INT> ent2cls;		// mappa una entità alla classe di appartenenza (per range e domain)
+multimap<INT, INT> rel2range;	// mappa una relazione nel range, che corrisponde ad una classe
 multimap<INT, INT> rel2domain;	// mappa una relazione nel domain, che corrisponde ad una classe
 multimap<INT, INT> cls2false_t; // data una entità, restituisce una classe falsa (per tail corruption)
 vector<vector<int>> concept_instance;
@@ -69,7 +50,6 @@ map<int, int> equivalentRel;
 // map<int,int> disjointWith;
 multimap<int, int> equivalentClass;
 map<int, int> entsubclass;
-const string typeOf = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>";
 int typeOf_id;
 INT trainSize, tripleTotal;
 
@@ -95,58 +75,6 @@ struct cmp_tail
 		return (a.t < b.t) || (a.t == b.t && a.r < b.r) || (a.t == b.t && a.r == b.r && a.h < b.h);
 	}
 };
-
-/*
-	There are some math functions for the program initialization.
-*/
-unsigned long long *next_random;
-
-unsigned long long randd(INT id)
-{
-	next_random[id] = next_random[id] * (unsigned long long)25214903917 + 11;
-	return next_random[id];
-}
-
-INT rand_max(INT id, INT x)
-{
-	INT res = randd(id) % x;
-	while (res < 0)
-		res += x;
-	return res;
-}
-
-REAL rand(REAL min, REAL max)
-{
-	return min + (max - min) * rand() / (RAND_MAX + 1.0);
-}
-
-REAL normal(REAL x, REAL miu, REAL sigma)
-{
-	return 1.0 / sqrt(2 * pi) / sigma * exp(-1 * (x - miu) * (x - miu) / (2 * sigma * sigma));
-}
-
-REAL randn(REAL miu, REAL sigma, REAL min, REAL max)
-{
-	REAL x, y, dScope;
-	do
-	{
-		x = rand(min, max);
-		y = normal(x, miu, sigma);
-		dScope = rand(0.0, normal(miu, miu, sigma));
-	} while (dScope > y);
-	return x;
-}
-
-void norm(REAL *con)
-{
-	REAL x = 0;
-	for (INT ii = 0; ii < dimension; ii++)
-		x += (*(con + ii)) * (*(con + ii));
-	x = sqrt(x);
-	if (x > 1)
-		for (INT ii = 0; ii < dimension; ii++)
-			*(con + ii) /= x;
-}
 
 // vero se l'entità index è di classe class_id
 bool inRange(int id_rel, int id_obj)
@@ -236,7 +164,7 @@ bool isSubclassOf(int rel_id)
 // vero se la relazione è di tipo InstanceOf
 bool isInstanceOf(int rel_id)
 {
-	return rel_id == -2;
+	return rel_id == typeOf_id;
 }
 
 int getInverse(int rel)
@@ -316,6 +244,7 @@ void owlInit()
 	string tmp;
 	map<string, int> rel2id;
 	map<string, int> ent2id;
+	map<string, int> class2id;
 
 	printf("Loading ontology information...\n");
 
@@ -346,6 +275,28 @@ void owlInit()
 	}
 	ent_file.close();
 
+	// carico le classi per il confronto
+	ifstream class2id_file(inPath + "class2id.txt");
+	getline(class2id_file, tmp);
+	while (getline(class2id_file, tmp))
+	{
+		string::size_type pos = tmp.find(' ', 0);
+		string classe = tmp.substr(0, pos);
+		int id = atoi(tmp.substr(pos + 1).c_str());
+		class2id.insert(pair<string, int>(classe, id));
+	}
+	class2id_file.close();
+
+	ifstream class_file(inPath + "entity2class.txt");
+	while (getline(class_file, tmp))
+	{
+		string::size_type pos = tmp.find('\t', 0);
+		int entity = atoi(tmp.substr(0, pos).c_str());
+		int class_id = atoi(tmp.substr(pos + 1).c_str());
+		ent2class.insert(pair<int, int>(entity, class_id));
+	}
+	class_file.close();
+
 	ifstream instanceOf_file(inPath + "instanceof.txt");
 	string tmpStr;
 	while (getline(instanceOf_file, tmpStr))
@@ -367,8 +318,8 @@ void owlInit()
 		int pos = tmpStr.find(' ', 0);
 		string a1 = tmpStr.substr(0, pos);
 		string b1 = tmpStr.substr(pos + 1);
-		int a = ent2id.find(a1)->second;
-		int b = ent2id.find(b1)->second;
+		int a = class2id.find(a1)->second;
+		int b = class2id.find(b1)->second;
 		addSubClassOf(a, b);
 		sub_up_concept[a].push_back(b);
 		up_sub_concept[b].push_back(a);
@@ -376,16 +327,6 @@ void owlInit()
 	subclassOf_file.close();
 
 	trainSize = tripleTotal + instanceOf.size() + subClassOf.size();
-
-	ifstream class_file(inPath + "entity2class.txt");
-	while (getline(class_file, tmp))
-	{
-		string::size_type pos = tmp.find('\t', 0);
-		int entity = atoi(tmp.substr(0, pos).c_str());
-		int class_id = atoi(tmp.substr(pos + 1).c_str());
-		ent2class.insert(pair<int, int>(entity, class_id));
-	}
-	class_file.close();
 
 	ifstream domain_file(inPath + "rs_domain2id.txt");
 	while (getline(domain_file, tmp))
@@ -510,7 +451,8 @@ void owlInit()
 */
 
 INT relationTotal, entityTotal, conceptTotal;
-REAL *relationVec, *entityVec, *conceptVec;
+REAL *relationVec, *entityVec;
+vector<vector<double> > conceptVec;
 REAL *relationVecDao, *entityVecDao;
 INT *freqRel, *freqEnt;
 REAL *left_mean, *right_mean;
@@ -548,12 +490,15 @@ void init()
 	tmp = fscanf(fin, "%d", &conceptTotal);
 	fclose(fin);
 
-	conceptVec = (REAL *)calloc(conceptTotal * dimension, sizeof(REAL));
-	for (INT i = 0; i < conceptTotal; i++)
-	{
-		for (INT ii = 0; ii < dimension; ii++)
-			conceptVec[i * dimension + ii] = randn(0, 1.0 / dimension, -6 / sqrt(dimension), 6 / sqrt(dimension));
-		norm(conceptVec + i * dimension);
+
+	conceptVec.resize(conceptTotal);
+	for(auto &i : conceptVec)
+		i.resize(dimension);
+	for(int i = 0; i < conceptTotal; ++i){
+		for(int j = 0; j < dimension; ++j){
+			conceptVec[i][j] = randn(0,1.0/dimension,-6/sqrt(dimension),6/sqrt(dimension));
+		}
+		normV(conceptVec[i]);
 	}
 
 	// ! CONTROLLARE SE BISOGNA FARE RELATIONTOTAL + ENTITYTOTAL + CONCEPTTOTAL
@@ -855,105 +800,242 @@ void gradient(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b)
 	}
 }
 
+
 /*
-void trainInstanceOf(int i, int cut){
-		i = i - fb_h.size();
-		int j = 0;
-		if(rand() % 2 == 0){
-				do{
-						if(!instance_brother[instanceOf[i].first].empty()){
-								if(rand() % 10 < cut){
-										j = randMax(entity_num);
-								}else{
-										j = rand() % (int)instance_brother[instanceOf[i].first].size();
-										j = instance_brother[instanceOf[i].first][j];
-								}
-						}else{
-								j = randMax(entity_num);
-						}
-				}while(instanceOf_ok.count(make_pair(j, instanceOf[i].second)) > 0);
-				doTrainInstanceOf(instanceOf[i].first, instanceOf[i].second, j, instanceOf[i].second);
-				norm(entity_tmp[j]);
-		}else{
-				do{
-						if(!concept_brother[instanceOf[i].second].empty()){
-								if(rand() % 10 < cut){
-										j = randMax(concept_num);
-								}else{
-										j = rand() % (int)concept_brother[instanceOf[i].second].size();
-										j = concept_brother[instanceOf[i].second][j];
-								}
-						}else{
-								j = randMax(concept_num);
-						}
-				}while(instanceOf_ok.count(make_pair(instanceOf[i].first, j)) > 0);
-				doTrainInstanceOf(instanceOf[i].first, instanceOf[i].second, instanceOf[i].first, j);
-				norm(concept_tmp[j]);
-				normR(concept_r_tmp[j]);
-		}
-		norm(entity_tmp[instanceOf[i].first]);
-		norm(concept_tmp[instanceOf[i].second]);
-		normR(concept_r_tmp[instanceOf[i].second]);
-}
-
-void trainSubClassOf(int i, int cut){
-		i = i - fb_h.size() - instanceOf.size();
-		int j = 0;
-		if(rand() % 2 == 0){
-				do{
-						if(!concept_brother[subClassOf[i].first].empty()){
-								if(rand() % 10 < cut){
-										j = randMax(concept_num);
-								}else{
-										j = rand() % (int)concept_brother[subClassOf[i].first].size();
-										j = concept_brother[subClassOf[i].first][j];
-								}
-						}else{
-								j = randMax(concept_num);
-						}
-				}while(subClassOf_ok.count(make_pair(j, subClassOf[i].second)) > 0);
-				doTrainSubClassOf(subClassOf[i].first, subClassOf[i].second, j, subClassOf[i].second);
-		}else{
-				do{
-						if(!concept_brother[subClassOf[i].second].empty()){
-								if(rand() % 10 < cut){
-										j = randMax(concept_num);
-								}else{
-										j = rand() % (int)concept_brother[subClassOf[i].second].size();
-										j = concept_brother[subClassOf[i].second][j];
-								}
-						}else{
-								j = randMax(concept_num);
-						}
-				}while(subClassOf_ok.count(make_pair(subClassOf[i].first, j)) > 0);
-				doTrainSubClassOf(subClassOf[i].first, subClassOf[i].second, subClassOf[i].first, j);
-		}
-		norm(concept_tmp[subClassOf[i].first]);
-		norm(concept_tmp[subClassOf[i].second]);
-		norm(concept_tmp[j]);
-		normR(concept_r_tmp[subClassOf[i].first]);
-		normR(concept_r_tmp[subClassOf[i].second]);
+void trainInstanceOf(int head, int tail, int cut, int id)
+{
+	
+	int j = 0;
+	if (rand() % 2 == 0)
+	{
+		do
+		{
+			if (!instance_brother[head].empty())
+			{
+				if (rand() % 10 < cut)
+				{
+					j = rand_max(entityTotal, id);
+				}
+				else
+				{
+					j = rand() % (int)instance_brother[head].size();
+					j = instance_brother[head][j];
+				}
+			}
+			else
+			{
+				j = rand_max(entityTotal, id);
+			}
+		} while (instanceOf_ok.count(make_pair(j, tail)) > 0);
+		doTrainInstanceOf(head, tail, j, tail);
+		normV(entity_tmp[j]);
+	}
+	else
+	{
+		do
+		{
+			if (!concept_brother[tail].empty())
+			{
+				if (rand() % 10 < cut)
+				{
+					j = rand_max(conceptTotal, id);
+				}
+				else
+				{
+					j = rand() % (int)concept_brother[tail].size();
+					j = concept_brother[tail][j];
+				}
+			}
+			else
+			{
+				j = rand_max(conceptTotal, id);
+			}
+		} while (instanceOf_ok.count(make_pair(head, j)) > 0);
+		doTrainInstanceOf(head, tail, head, j);
+		normV(concept_tmp[j]);
 		normR(concept_r_tmp[j]);
-}
-void doTrainInstanceOf(int e_a, int c_a, int e_b, int c_b){
-		double sum1 = calcSumInstanceOf(e_a, c_a);
-		double sum2 = calcSumInstanceOf(e_b, c_b);
-		if(sum1 + margin_instance > sum2){
-				res += (margin_instance + sum1 - sum2);
-				gradientInstanceOf(e_a, c_a, e_b, c_b);
-		}
+	}
+	normV(entity_tmp[head]);
+	normV(concept_tmp[tail]);
+	normR(concept_r_tmp[tail]);
 }
 
-void doTrainSubClassOf(int c1_a, int c2_a, int c1_b, int c2_b){
-		double sum1 = calcSumSubClassOf(c1_a, c2_a);
-		double sum2 = calcSumSubClassOf(c1_b, c2_b);
-		if(sum1 + margin_subclass > sum2){
-				res += (margin_subclass + sum1 - sum2);
-				gradientSubClassOf(c1_a, c2_a, c1_b, c2_b);
-		}
+void trainSubClassOf(int head, int tail, int cut, int id)
+{
+	int j = 0;
+	if (rand() % 2 == 0)
+	{
+		do
+		{
+			if (!concept_brother[head].empty())
+			{
+				if (rand() % 10 < cut)
+				{
+					j = rand_max(conceptTotal, id);
+				}
+				else
+				{
+					j = rand() % (int)concept_brother[head].size();
+					j = concept_brother[head][j];
+				}
+			}
+			else
+			{
+				j = rand_max(conceptTotal, id);
+			}
+		} while (subClassOf_ok.count(make_pair(j, tail)) > 0);
+		doTrainSubClassOf(head, tail, j, tail);
+	}
+	else
+	{
+		do
+		{
+			if (!concept_brother[tail].empty())
+			{
+				if (rand() % 10 < cut)
+				{
+					j = rand_max(conceptTotal, id);
+				}
+				else
+				{
+					j = rand() % (int)concept_brother[tail].size();
+					j = concept_brother[tail][j];
+				}
+			}
+			else
+			{
+				j = rand_max(conceptTotal, id);
+			}
+		} while (subClassOf_ok.count(make_pair(head, j)) > 0);
+		doTrainSubClassOf(head, tail, head, j);
+	}
+	normV(concept_tmp[head]);
+	normV(concept_tmp[tail]);
+	normV(concept_tmp[j]);
+	normR(concept_r_tmp[head]);
+	normR(concept_r_tmp[tail]);
+	normR(concept_r_tmp[j]);
+}
+void doTrainInstanceOf(int e_a, int c_a, int e_b, int c_b)
+{
+	double sum1 = calcSumInstanceOf(e_a, c_a);
+	double sum2 = calcSumInstanceOf(e_b, c_b);
+	if (sum1 + margin_instance > sum2)
+	{
+		res += (margin_instance + sum1 - sum2);
+		gradientInstanceOf(e_a, c_a, e_b, c_b);
+	}
 }
 
+void doTrainSubClassOf(int c1_a, int c2_a, int c1_b, int c2_b)
+{
+	double sum1 = calcSumSubClassOf(c1_a, c2_a);
+	double sum2 = calcSumSubClassOf(c1_b, c2_b);
+	if (sum1 + margin_subclass > sum2)
+	{
+		res += (margin_subclass + sum1 - sum2);
+		gradientSubClassOf(c1_a, c2_a, c1_b, c2_b);
+	}
+}
+
+
+double calcSumInstanceOf(int e, int c){
+	double dis = 0;
+	for(int i = 0; i < dimension; ++i){
+		dis += sqr(entity_vec[e][i] - conceptVec[c][i]);
+	}
+	if(dis < sqr(concept_r[c])){
+		return 0;
+	}
+	return dis - sqr(concept_r[c]);
+
+}
+
+double calcSumSubClassOf(int c1, int c2){
+	double dis = 0;
+	for(int i = 0; i < dimension; ++i){
+		dis += sqr(conceptVec[c1][i] - conceptVec[c2][i]);
+	}
+	if(sqrt(dis) < fabs(concept_r[c1] - concept_r[c2])){
+		return 0;
+	}
+	return dis - sqr(concept_r[c2]) + sqr(concept_r[c1]);
+
+}
+
+void gradientInstanceOf(int e_a, int c_a, int e_b, int c_b)
+{
+	double dis = 0;
+	for (int i = 0; i < dimension; ++i)
+	{
+		dis += sqr(entity_vec[e_a][i] - conceptVec[c_a][i]);
+	}
+	if (dis > sqr(concept_r[c_a]))
+	{
+		for (int j = 0; j < dimension; ++j)
+		{
+			double x = 2 * (entity_vec[e_a][j] - conceptVec[c_a][j]);
+			entity_tmp[e_a][j] -= x * RATE;
+			concept_tmp[c_a][j] -= -1 * x * RATE;
+		}
+		concept_r_tmp[c_a] -= -2 * concept_r[c_a] * RATE;
+	}
+
+	dis = 0;
+	for (int i = 0; i < dimension; ++i)
+	{
+		dis += sqr(entity_vec[e_b][i] - conceptVec[c_b][i]);
+	}
+	if (dis > sqr(concept_r[c_b]))
+	{
+		for (int j = 0; j < dimension; ++j)
+		{
+			double x = 2 * (entity_vec[e_b][j] - conceptVec[c_b][j]);
+			entity_tmp[e_b][j] += x * RATE;
+			concept_tmp[c_b][j] += -1 * x * RATE;
+		}
+		concept_r_tmp[c_b] += -2 * concept_r[c_b] * RATE;
+	}
+}
+
+void gradientSubClassOf(int c1_a, int c2_a, int c1_b, int c2_b)
+{
+	double dis = 0;
+	for (int i = 0; i < dimension; ++i)
+	{
+		dis += sqr(conceptVec[c1_a][i] - conceptVec[c2_a][i]);
+	}
+	if (sqrt(dis) > fabs(concept_r[c1_a] - concept_r[c2_a]))
+	{
+		for (int i = 0; i < dimension; ++i)
+		{
+			double x = 2 * (conceptVec[c1_a][i] - conceptVec[c2_a][i]);
+			concept_tmp[c1_a][i] -= x * RATE;
+			concept_tmp[c2_a][i] -= -x * RATE;
+		}
+		concept_r_tmp[c1_a] -= 2 * concept_r[c1_a] * RATE;
+		concept_r_tmp[c2_a] -= -2 * concept_r[c2_a] * RATE;
+	}
+
+	dis = 0;
+	for (int i = 0; i < dimension; ++i)
+	{
+		dis += sqr(conceptVec[c1_b][i] - conceptVec[c2_b][i]);
+	}
+	if (sqrt(dis) > fabs(concept_r[c1_b] - concept_r[c2_b]))
+	{
+		for (int i = 0; i < dimension; ++i)
+		{
+			double x = 2 * (conceptVec[c1_b][i] - conceptVec[c2_b][i]);
+			concept_tmp[c1_b][i] += x * RATE;
+			concept_tmp[c2_b][i] += -x * RATE;
+		}
+		concept_r_tmp[c1_b] += 2 * concept_r[c1_b] * RATE;
+		concept_r_tmp[c2_b] += -2 * concept_r[c2_b] * RATE;
+	}
+}
 */
+
 void gradientSubClass(INT cls1_a, INT cls2_a, INT cls1_b, INT cls2_b)
 {
 	INT lasta1 = cls1_a * dimension;
@@ -1160,7 +1242,17 @@ void gradientEquivalentClass(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, 
 
 void train_kb(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b, INT id)
 {
-	// e1_a,rel_a,e2_a è una tupla presente in train2id.txt
+	if (isInstanceOf(rel_a))
+	{
+		int cut = 10 - (int)(epoch * ins_cut / trainTimes);
+		//trainInstanceOf(e1_a, e2_a, cut, id);
+	}
+	else if (isSubclassOf(rel_a))
+	{
+		int cut = 10 - (int)(epoch * sub_cut / trainTimes);
+		//trainSubClassOf(e1_a, e2_a, cut, id);
+	}
+
 	REAL sum1 = calc_sum(e1_a, e2_a, rel_a);
 	REAL sum2 = calc_sum(e1_b, e2_b, rel_b);
 	if (sum1 + margin > sum2)
@@ -1177,12 +1269,6 @@ void train_kb(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b, INT 
 		else if (getEquivalentProperty(rel_a) != -1)
 		{
 			gradientEquivalentProperty(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b, getEquivalentProperty(rel_a));
-		} else if(isInstanceOf(rel_a)) {
-			int cut = 10 - (int)(epoch * ins_cut / nepoch);
-			trainInstanceOf(i, cut);
-		} else if(isSubclassOf(rel_a)) {
-			int cut = 10 - (int)(epoch * sub_cut / nepoch);
-			trainSubClassOf(i, cut);
 		}
 		else
 		{
@@ -1257,24 +1343,26 @@ int train(int triple_index, int id)
 	int j = -1;
 	uint pr;
 
-	if(triple_index > tripleTotal + instanceOf.size()) {
-		// SubclassOf
-		int idx_sub = triple_index - instanceOf.size();
+	if (triple_index > tripleTotal + instanceOf.size())
+	{
+		// Triple SubclassOf
+		int idx_sub = triple_index - tripleTotal - instanceOf.size();
 		int h = subClassOf.at(idx_sub).first;
 		int t = subClassOf.at(idx_sub).second;
 
 		train_kb(h, t, -1, 0, 0, -1, id);
-	} else if(triple_index > tripleTotal) {
+	}
+	else if (triple_index > tripleTotal)
+	{
 		// Triple instanceOf
 		int idx_ins = triple_index - tripleTotal;
 		int h = instanceOf.at(idx_ins).first;
 		int t = instanceOf.at(idx_ins).second;
 
-		train_kb(h, t, -2, 0, 0, -2, id);
+		train_kb(h, t, typeOf_id, 0, 0, typeOf_id, id);
 	}
 
 	// Triple del Training Set
-
 	if (bernFlag)
 		pr = 1000 * right_mean[trainList[triple_index].r] / (right_mean[trainList[triple_index].r] + left_mean[trainList[triple_index].r]);
 	else
@@ -1309,13 +1397,14 @@ void *trainMode(void *con)
 {
 	INT id, index, j;
 	id = (unsigned long long)(con);
-	next_random[id] = rand();
+	set_next_random_id(id);
 	for (INT k = Batch / threads; k >= 0; k--)
 	{
 		index = rand_max(id, trainSize); // ottieni un indice casuale
 		j = train(index, id);
 
-		if(index < tripleTotal) {
+		if (index < tripleTotal)
+		{
 			norm(relationVec + dimension * trainList[index].r);
 			norm(entityVec + dimension * trainList[index].h);
 			norm(entityVec + dimension * trainList[index].t);
@@ -1331,18 +1420,25 @@ void train(void *con)
 
 	Len = tripleTotal;
 	Batch = Len / nbatches;
-	next_random = (unsigned long long *)calloc(threads, sizeof(unsigned long long));
-	for (INT epoch = 0; epoch < trainTimes; epoch++)
+	set_next_random();
+	for (epoch = 0; epoch < trainTimes; epoch++)
 	{
 		res = 0;
 		for (INT batch = 0; batch < nbatches; batch++)
 		{
-			pthread_t *pt = (pthread_t *)malloc(threads * sizeof(pthread_t));
-			for (long a = 0; a < threads; a++)
-				pthread_create(&pt[a], NULL, trainMode, (void *)a);
-			for (long a = 0; a < threads; a++)
-				pthread_join(pt[a], NULL);
-			free(pt);
+			if (!debug)
+			{
+				pthread_t *pt = (pthread_t *)malloc(threads * sizeof(pthread_t));
+				for (long a = 0; a < threads; a++)
+					pthread_create(&pt[a], NULL, trainMode, (void *)a);
+				for (long a = 0; a < threads; a++)
+					pthread_join(pt[a], NULL);
+				free(pt);
+			}
+			else
+			{
+				trainMode(0);
+			}
 		}
 		printf("epoch %d %f %d\n", epoch, res, trainTimes);
 
