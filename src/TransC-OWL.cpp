@@ -71,6 +71,7 @@ multimap<int, int> equivalentClass;
 map<int, int> entsubclass;
 const string typeOf = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>";
 int typeOf_id;
+INT trainSize, tripleTotal;
 
 struct Triple
 {
@@ -226,6 +227,18 @@ bool isFunctional(int rel_id)
 	return false;
 }
 
+// vero se la relazione è di tipo SubclassOf
+bool isSubclassOf(int rel_id)
+{
+	return rel_id == -1;
+}
+
+// vero se la relazione è di tipo InstanceOf
+bool isInstanceOf(int rel_id)
+{
+	return rel_id == -2;
+}
+
 int getInverse(int rel)
 {
 	if (inverse.size() == 0)
@@ -362,6 +375,8 @@ void owlInit()
 	}
 	subclassOf_file.close();
 
+	trainSize = tripleTotal + instanceOf.size() + subClassOf.size();
+
 	ifstream class_file(inPath + "entity2class.txt");
 	while (getline(class_file, tmp))
 	{
@@ -494,7 +509,7 @@ void owlInit()
 	Read triples from the training file.
 */
 
-INT relationTotal, entityTotal, conceptTotal, tripleTotal;
+INT relationTotal, entityTotal, conceptTotal;
 REAL *relationVec, *entityVec, *conceptVec;
 REAL *relationVecDao, *entityVecDao;
 INT *freqRel, *freqEnt;
@@ -1162,12 +1177,12 @@ void train_kb(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b, INT 
 		else if (getEquivalentProperty(rel_a) != -1)
 		{
 			gradientEquivalentProperty(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b, getEquivalentProperty(rel_a));
-			/*} else if(is_instanceOf di rel_a) {
-					int cut = 10 - (int)(epoch * ins_cut / nepoch);
-					trainInstanceOf(i, cut);
-			} else if(is_subClassOf di rel_a) {
-					int cut = 10 - (int)(epoch * sub_cut / nepoch);
-					trainSubClassOf(i, cut);*/
+		} else if(isInstanceOf(rel_a)) {
+			int cut = 10 - (int)(epoch * ins_cut / nepoch);
+			trainInstanceOf(i, cut);
+		} else if(isSubclassOf(rel_a)) {
+			int cut = 10 - (int)(epoch * sub_cut / nepoch);
+			trainSubClassOf(i, cut);
 		}
 		else
 		{
@@ -1237,10 +1252,29 @@ bool hasDomain(int rel)
 }
 
 // scegli in modo casuale una coda o una testa da corrompere e addestra
-int train(int triple_index, int id, int range, int domain)
+int train(int triple_index, int id)
 {
 	int j = -1;
 	uint pr;
+
+	if(triple_index > tripleTotal + instanceOf.size()) {
+		// SubclassOf
+		int idx_sub = triple_index - instanceOf.size();
+		int h = subClassOf.at(idx_sub).first;
+		int t = subClassOf.at(idx_sub).second;
+
+		train_kb(h, t, -1, 0, 0, -1, id);
+	} else if(triple_index > tripleTotal) {
+		// Triple instanceOf
+		int idx_ins = triple_index - tripleTotal;
+		int h = instanceOf.at(idx_ins).first;
+		int t = instanceOf.at(idx_ins).second;
+
+		train_kb(h, t, -2, 0, 0, -2, id);
+	}
+
+	// Triple del Training Set
+
 	if (bernFlag)
 		pr = 1000 * right_mean[trainList[triple_index].r] / (right_mean[trainList[triple_index].r] + left_mean[trainList[triple_index].r]);
 	else
@@ -1278,25 +1312,15 @@ void *trainMode(void *con)
 	next_random[id] = rand();
 	for (INT k = Batch / threads; k >= 0; k--)
 	{
-		index = rand_max(id, Len); // ottieni un indice casuale
+		index = rand_max(id, trainSize); // ottieni un indice casuale
+		j = train(index, id);
 
-		// otteni il dominio della relazione e la classe della entità testa che dovrà rispettarlo
-		int domain = -1;
-		if (rel2domain.find(trainList[index].r) != rel2domain.end())
-		{
-			domain = rel2domain.find(trainList[index].r)->second;
+		if(index < tripleTotal) {
+			norm(relationVec + dimension * trainList[index].r);
+			norm(entityVec + dimension * trainList[index].h);
+			norm(entityVec + dimension * trainList[index].t);
+			norm(entityVec + dimension * j);
 		}
-		// otteni il codominio (range) della relazione e la classe della entità coda che dovrà rispettarlo
-		int range = -1;
-		if (rel2range.find(trainList[index].r) != rel2range.end())
-		{
-			range = rel2range.find(trainList[index].r)->second;
-		}
-		j = train(index, id, range, domain);
-		norm(relationVec + dimension * trainList[index].r);
-		norm(entityVec + dimension * trainList[index].h);
-		norm(entityVec + dimension * trainList[index].t);
-		norm(entityVec + dimension * j);
 	}
 	pthread_exit(NULL);
 }
