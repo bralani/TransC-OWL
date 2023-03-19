@@ -52,48 +52,48 @@
     static const string typeOf = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>";
 
 
-    INT *lefHead, *rigHead;
-    INT *lefTail, *rigTail;
+    static INT *lefHead, *rigHead;
+    static INT *lefTail, *rigTail;
 
     // OWL Variable
-    multimap<INT, INT> ent2class;	// mappa una entità nella classe di appartenzenza (se disponibile) id dbpedia
-    multimap<INT, INT> ent2cls;		// mappa una entità alla classe di appartenenza (per range e domain)
-    multimap<INT, INT> rel2range;	// mappa una relazione nel range, che corrisponde ad una classe
-    multimap<INT, INT> rel2domain;	// mappa una relazione nel domain, che corrisponde ad una classe
-    multimap<INT, INT> cls2false_t; // data una entità, restituisce una classe falsa (per tail corruption)
-    vector<vector<int>> concept_instance;
-    vector<vector<int>> instance_concept;
-    vector<vector<int>> instance_brother;
-    vector<vector<int>> sub_up_concept;
-    vector<vector<int>> up_sub_concept;
-    vector<vector<int>> concept_brother;
-    list<int> functionalRel;
-    map<int, int> inverse;
-    map<int, int> equivalentRel;
-    // map<int,int> disjointWith;
-    int typeOf_id;
-    INT trainSize, tripleTotal;
+    static multimap<INT, INT> ent2class;	// mappa una entità nella classe di appartenzenza (se disponibile) id dbpedia
+    static multimap<INT, INT> ent2cls;		// mappa una entità alla classe di appartenenza (per range e domain)
+    static multimap<INT, INT> rel2range;	// mappa una relazione nel range, che corrisponde ad una classe
+    static multimap<INT, INT> rel2domain;	// mappa una relazione nel domain, che corrisponde ad una classe
+    static multimap<INT, INT> cls2false_t; // data una entità, restituisce una classe falsa (per tail corruption)
+    static vector<vector<int>> concept_instance;
+    static vector<vector<int>> instance_concept;
+    static vector<vector<int>> instance_brother;
+    static vector<vector<int>> sub_up_concept;
+    static vector<vector<int>> up_sub_concept;
+    static vector<vector<int>> concept_brother;
+    static list<int> functionalRel;
+    static map<int, int> inverse;
+    static map<int, int> equivalentRel;
+    // static map<int,int> disjointWith;
+    static int typeOf_id;
+    static INT trainSize, tripleTotal;
+
+
+    static map<pair<int, int>, map<int, int>> ok;
+    static map<pair<int, int>, int> subClassOf_ok;
+    static map<pair<int, int>, int> instanceOf_ok;
+    static vector<pair<int, int>> subClassOf;
+    static vector<pair<int, int>> instanceOf;
+
+    static INT relationTotal, entityTotal, conceptTotal;
+    static REAL *relationVec, *entityVec;
+    static vector<vector<double> > conceptVec;
+    static REAL *relationVecDao, *entityVecDao;
+    static INT *freqRel, *freqEnt;
+    static REAL *left_mean, *right_mean;
+
 
     struct Triple
     {
         INT h, r, t;
     };
-
-    Triple *trainHead, *trainTail, *trainList;
-
-    map<pair<int, int>, map<int, int>> ok;
-    map<pair<int, int>, int> subClassOf_ok;
-    map<pair<int, int>, int> instanceOf_ok;
-    vector<pair<int, int>> subClassOf;
-    vector<pair<int, int>> instanceOf;
-
-    INT relationTotal, entityTotal, conceptTotal;
-    REAL *relationVec, *entityVec;
-    vector<vector<double> > conceptVec;
-    REAL *relationVecDao, *entityVecDao;
-    INT *freqRel, *freqEnt;
-    REAL *left_mean, *right_mean;
-
+    static Triple *trainHead, *trainTail, *trainList;
 
     struct cmp_head
     {
