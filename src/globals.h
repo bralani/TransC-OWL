@@ -1,37 +1,114 @@
 #ifndef GLOBALS_H
 #define GLOBALS_H
 
-#include <string>
+    #define REAL float
+    #define INT int
 
-using namespace std;
+    #include <iostream>
+    #include <cstdio>
+    #include <cstdlib>
+    #include <cmath>
+    #include <string>
+    #include <map>
+    #include <list>
+    #include <set>
+    #include <vector>
 
-static const bool debug = true; // se true crea un solo thread per addestrare il modello (per permettere il debug)
+    using namespace std;
 
-static int threads = 12;
-static int bernFlag = 1;
-static int loadBinaryFlag = 0;
-static int outBinaryFlag = 0;
-static int trainTimes = 1000; // epoch - 1000
-static int nbatches = 50;	   // batches - 50/100
-static int dimension = 100;
-static int epoch;
-static float alpha = 0.001;
-static float margin = 1.0;
-static float margin_instance = 0.4;
-static float margin_subclass = 0.3;
-static float ins_cut = 8.0;
-static float sub_cut = 8.0;
-static float RATE = 0.001;
+    static int dimension = 100;         // dimensione dei vettori
+    static int bernFlag = 1;
 
-static int failed = 0;
-static int tot_batches = 0;
-static int wrong = 0;
 
-static string inPath = "Train/";
-static string outPath = "Output/";
-static string loadPath = "";
-static string note = "_OWL";
+    static const bool debug = true;     // se true crea un solo thread (per permettere il debug)
+    static int threads = 12;            // numero di thread (funziona solo solo se debug = false)
+    static int trainTimes = 1000;       // trainTimes(epoch) - 1000
+    static int nbatches = 50;	        // batches - 50/100
+    static int epoch;                   // epoch attuale
 
-static const string typeOf = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>";
+
+    /* Costanti per iperparametri numerici */
+    static float alpha = 0.001;
+    static float margin = 1.0;
+    static float margin_instance = 0.4;
+    static float margin_subclass = 0.3;
+    static float ins_cut = 8.0;
+    static float sub_cut = 8.0;
+    static float RATE = 0.001;
+
+
+    /* Costanti per salvataggio e caricamento */
+    static string note = "_OWL";       // estensione del file dei vettori (da non modificare)
+
+    static int loadBinaryFlag = 0;    // flag che indica se caricare i dati da file binari
+    static string loadPath = "";            // percorso dove caricare i vettori addestrati
+    static string inPath = "Train/";        // percorso dove prelevare il training set
+
+    static int outBinaryFlag = 0;     // flag che indica se salvare i dati in file binari
+    static string outPath = "Output/";      // percorso dove salvare i vettori addestrati
+
+
+    // relazione type (ovvero instanceOf)
+    static const string typeOf = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>";
+
+
+    INT *lefHead, *rigHead;
+    INT *lefTail, *rigTail;
+
+    // OWL Variable
+    multimap<INT, INT> ent2class;	// mappa una entità nella classe di appartenzenza (se disponibile) id dbpedia
+    multimap<INT, INT> ent2cls;		// mappa una entità alla classe di appartenenza (per range e domain)
+    multimap<INT, INT> rel2range;	// mappa una relazione nel range, che corrisponde ad una classe
+    multimap<INT, INT> rel2domain;	// mappa una relazione nel domain, che corrisponde ad una classe
+    multimap<INT, INT> cls2false_t; // data una entità, restituisce una classe falsa (per tail corruption)
+    vector<vector<int>> concept_instance;
+    vector<vector<int>> instance_concept;
+    vector<vector<int>> instance_brother;
+    vector<vector<int>> sub_up_concept;
+    vector<vector<int>> up_sub_concept;
+    vector<vector<int>> concept_brother;
+    list<int> functionalRel;
+    map<int, int> inverse;
+    map<int, int> equivalentRel;
+    // map<int,int> disjointWith;
+    int typeOf_id;
+    INT trainSize, tripleTotal;
+
+    struct Triple
+    {
+        INT h, r, t;
+    };
+
+    Triple *trainHead, *trainTail, *trainList;
+
+    map<pair<int, int>, map<int, int>> ok;
+    map<pair<int, int>, int> subClassOf_ok;
+    map<pair<int, int>, int> instanceOf_ok;
+    vector<pair<int, int>> subClassOf;
+    vector<pair<int, int>> instanceOf;
+
+    INT relationTotal, entityTotal, conceptTotal;
+    REAL *relationVec, *entityVec;
+    vector<vector<double> > conceptVec;
+    REAL *relationVecDao, *entityVecDao;
+    INT *freqRel, *freqEnt;
+    REAL *left_mean, *right_mean;
+
+
+    struct cmp_head
+    {
+        bool operator()(const Triple &a, const Triple &b)
+        {
+            return (a.h < b.h) || (a.h == b.h && a.r < b.r) || (a.h == b.h && a.r == b.r && a.t < b.t);
+        }
+    };
+
+    struct cmp_tail
+    {
+        bool operator()(const Triple &a, const Triple &b)
+        {
+            return (a.t < b.t) || (a.t == b.t && a.r < b.r) || (a.t == b.t && a.r == b.r && a.h < b.h);
+        }
+    };
 
 #endif
