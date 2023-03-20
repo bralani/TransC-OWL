@@ -1,9 +1,0 @@
-{
-    "files.associations": {
-        "*.tcc": "cpp",
-        "random": "cpp",
-        "numbers": "cpp",
-        "cmath": "cpp",
-        "vector": "cpp"
-    }
-}

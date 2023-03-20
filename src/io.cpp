@@ -338,10 +338,7 @@ void init()
 		left_mean[i] = freqRel[i] / left_mean[i];
 		right_mean[i] = freqRel[i] / right_mean[i];
 	}
-
-	relationVecDao = (REAL *)calloc(dimension * relationTotal, sizeof(REAL));
-	entityVecDao = (REAL *)calloc(dimension * entityTotal, sizeof(REAL));
-
+	
 	concept_instance.resize(conceptTotal);
 	instance_concept.resize(entityTotal);
 	sub_up_concept.resize(conceptTotal);
