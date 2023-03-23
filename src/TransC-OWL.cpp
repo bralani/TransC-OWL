@@ -251,6 +251,126 @@ void gradient(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b)
 	}
 }
 
+/*
+double calcSumInstanceOf(int e, int c){
+	double dis = 0;
+	for(int i = 0; i < dimension; ++i){
+		dis += sqr(entity_vec[e][i] - conceptVec[c][i]);
+	}
+	if(dis < sqr(concept_r[c])){
+		return 0;
+	}
+	return dis - sqr(concept_r[c]);
+
+}*/
+
+double calcSumSubClassOf(int c1, int c2){
+	double dis = 0;
+	for(int i = 0; i < dimension; ++i){
+		dis += sqr(conceptVec[c1][i] - conceptVec[c2][i]);
+	}
+	if(sqrt(dis) < fabs(concept_r[c1] - concept_r[c2])){
+		return 0;
+	}
+	return dis - sqr(concept_r[c2]) + sqr(concept_r[c1]);
+
+}
+
+/*
+void gradientInstanceOf(int e_a, int c_a, int e_b, int c_b)
+{
+	double dis = 0;
+	for (int i = 0; i < dimension; ++i)
+	{
+		dis += sqr(entity_vec[e_a][i] - conceptVec[c_a][i]);
+	}
+	if (dis > sqr(concept_r[c_a]))
+	{
+		for (int j = 0; j < dimension; ++j)
+		{
+			double x = 2 * (entity_vec[e_a][j] - conceptVec[c_a][j]);
+			entity_tmp[e_a][j] -= x * RATE;
+			conceptVec[c_a][j] -= -1 * x * RATE;
+		}
+		concept_r[c_a] -= -2 * concept_r[c_a] * RATE;
+	}
+
+	dis = 0;
+	for (int i = 0; i < dimension; ++i)
+	{
+		dis += sqr(entity_vec[e_b][i] - conceptVec[c_b][i]);
+	}
+	if (dis > sqr(concept_r[c_b]))
+	{
+		for (int j = 0; j < dimension; ++j)
+		{
+			double x = 2 * (entity_vec[e_b][j] - conceptVec[c_b][j]);
+			entity_tmp[e_b][j] += x * RATE;
+			conceptVec[c_b][j] += -1 * x * RATE;
+		}
+		concept_r[c_b] += -2 * concept_r[c_b] * RATE;
+	}
+}*/
+
+void gradientSubClassOf(int c1_a, int c2_a, int c1_b, int c2_b)
+{
+	double dis = 0;
+	for (int i = 0; i < dimension; ++i)
+	{
+		dis += sqr(conceptVec[c1_a][i] - conceptVec[c2_a][i]);
+	}
+	if (sqrt(dis) > fabs(concept_r[c1_a] - concept_r[c2_a]))
+	{
+		for (int i = 0; i < dimension; ++i)
+		{
+			double x = 2 * (conceptVec[c1_a][i] - conceptVec[c2_a][i]);
+			conceptVec[c1_a][i] -= x * RATE;
+			conceptVec[c2_a][i] -= -x * RATE;
+		}
+		concept_r[c1_a] -= 2 * concept_r[c1_a] * RATE;
+		concept_r[c2_a] -= -2 * concept_r[c2_a] * RATE;
+	}
+
+	dis = 0;
+	for (int i = 0; i < dimension; ++i)
+	{
+		dis += sqr(conceptVec[c1_b][i] - conceptVec[c2_b][i]);
+	}
+	if (sqrt(dis) > fabs(concept_r[c1_b] - concept_r[c2_b]))
+	{
+		for (int i = 0; i < dimension; ++i)
+		{
+			double x = 2 * (conceptVec[c1_b][i] - conceptVec[c2_b][i]);
+			conceptVec[c1_b][i] += x * RATE;
+			conceptVec[c2_b][i] += -x * RATE;
+		}
+		concept_r[c1_b] += 2 * concept_r[c1_b] * RATE;
+		concept_r[c2_b] += -2 * concept_r[c2_b] * RATE;
+	}
+}
+
+/*
+void doTrainInstanceOf(int e_a, int c_a, int e_b, int c_b)
+{
+	double sum1 = calcSumInstanceOf(e_a, c_a);
+	double sum2 = calcSumInstanceOf(e_b, c_b);
+	if (sum1 + margin_instance > sum2)
+	{
+		res += (margin_instance + sum1 - sum2);
+		gradientInstanceOf(e_a, c_a, e_b, c_b);
+	}
+}*/
+
+void doTrainSubClassOf(int c1_a, int c2_a, int c1_b, int c2_b)
+{
+	double sum1 = calcSumSubClassOf(c1_a, c2_a);
+	double sum2 = calcSumSubClassOf(c1_b, c2_b);
+	if (sum1 + margin_subclass > sum2)
+	{
+		res += (margin_subclass + sum1 - sum2);
+		gradientSubClassOf(c1_a, c2_a, c1_b, c2_b);
+	}
+}
 
 /*
 void trainInstanceOf(int head, int tail, int cut, int id)
@@ -265,7 +385,7 @@ void trainInstanceOf(int head, int tail, int cut, int id)
 			{
 				if (rand() % 10 < cut)
 				{
-					j = rand_max(entityTotal, id);
+					j = rand_max2(entityTotal);
 				}
 				else
 				{
@@ -275,7 +395,7 @@ void trainInstanceOf(int head, int tail, int cut, int id)
 			}
 			else
 			{
-				j = rand_max(entityTotal, id);
+				j = rand_max2(entityTotal);
 			}
 		} while (instanceOf_ok.count(make_pair(j, tail)) > 0);
 		doTrainInstanceOf(head, tail, j, tail);
@@ -289,7 +409,7 @@ void trainInstanceOf(int head, int tail, int cut, int id)
 			{
 				if (rand() % 10 < cut)
 				{
-					j = rand_max(conceptTotal, id);
+					j = rand_max2(conceptTotal);
 				}
 				else
 				{
@@ -299,17 +419,17 @@ void trainInstanceOf(int head, int tail, int cut, int id)
 			}
 			else
 			{
-				j = rand_max(conceptTotal, id);
+				j = rand_max2(conceptTotal);
 			}
 		} while (instanceOf_ok.count(make_pair(head, j)) > 0);
 		doTrainInstanceOf(head, tail, head, j);
-		normV(concept_tmp[j]);
-		normR(concept_r_tmp[j]);
+		normV(conceptVec[j]);
+		normR(concept_r[j]);
 	}
 	normV(entity_tmp[head]);
-	normV(concept_tmp[tail]);
-	normR(concept_r_tmp[tail]);
-}
+	normV(conceptVec[tail]);
+	normR(concept_r[tail]);
+} */
 
 void trainSubClassOf(int head, int tail, int cut, int id)
 {
@@ -322,7 +442,7 @@ void trainSubClassOf(int head, int tail, int cut, int id)
 			{
 				if (rand() % 10 < cut)
 				{
-					j = rand_max(conceptTotal, id);
+					j = rand_max2(conceptTotal);
 				}
 				else
 				{
@@ -332,7 +452,7 @@ void trainSubClassOf(int head, int tail, int cut, int id)
 			}
 			else
 			{
-				j = rand_max(conceptTotal, id);
+				j = rand_max2(conceptTotal);
 			}
 		} while (subClassOf_ok.count(make_pair(j, tail)) > 0);
 		doTrainSubClassOf(head, tail, j, tail);
@@ -345,7 +465,7 @@ void trainSubClassOf(int head, int tail, int cut, int id)
 			{
 				if (rand() % 10 < cut)
 				{
-					j = rand_max(conceptTotal, id);
+					j = rand_max2(conceptTotal);
 				}
 				else
 				{
@@ -355,137 +475,19 @@ void trainSubClassOf(int head, int tail, int cut, int id)
 			}
 			else
 			{
-				j = rand_max(conceptTotal, id);
+				j = rand_max2(conceptTotal);
 			}
 		} while (subClassOf_ok.count(make_pair(head, j)) > 0);
 		doTrainSubClassOf(head, tail, head, j);
 	}
-	normV(concept_tmp[head]);
-	normV(concept_tmp[tail]);
-	normV(concept_tmp[j]);
-	normR(concept_r_tmp[head]);
-	normR(concept_r_tmp[tail]);
-	normR(concept_r_tmp[j]);
-}
-void doTrainInstanceOf(int e_a, int c_a, int e_b, int c_b)
-{
-	double sum1 = calcSumInstanceOf(e_a, c_a);
-	double sum2 = calcSumInstanceOf(e_b, c_b);
-	if (sum1 + margin_instance > sum2)
-	{
-		res += (margin_instance + sum1 - sum2);
-		gradientInstanceOf(e_a, c_a, e_b, c_b);
-	}
+	normV(conceptVec[head]);
+	normV(conceptVec[tail]);
+	normV(conceptVec[j]);
+	normR(concept_r[head]);
+	normR(concept_r[tail]);
+	normR(concept_r[j]);
 }
 
-void doTrainSubClassOf(int c1_a, int c2_a, int c1_b, int c2_b)
-{
-	double sum1 = calcSumSubClassOf(c1_a, c2_a);
-	double sum2 = calcSumSubClassOf(c1_b, c2_b);
-	if (sum1 + margin_subclass > sum2)
-	{
-		res += (margin_subclass + sum1 - sum2);
-		gradientSubClassOf(c1_a, c2_a, c1_b, c2_b);
-	}
-}
-
-
-double calcSumInstanceOf(int e, int c){
-	double dis = 0;
-	for(int i = 0; i < dimension; ++i){
-		dis += sqr(entity_vec[e][i] - conceptVec[c][i]);
-	}
-	if(dis < sqr(concept_r[c])){
-		return 0;
-	}
-	return dis - sqr(concept_r[c]);
-
-}
-
-double calcSumSubClassOf(int c1, int c2){
-	double dis = 0;
-	for(int i = 0; i < dimension; ++i){
-		dis += sqr(conceptVec[c1][i] - conceptVec[c2][i]);
-	}
-	if(sqrt(dis) < fabs(concept_r[c1] - concept_r[c2])){
-		return 0;
-	}
-	return dis - sqr(concept_r[c2]) + sqr(concept_r[c1]);
-
-}
-
-void gradientInstanceOf(int e_a, int c_a, int e_b, int c_b)
-{
-	double dis = 0;
-	for (int i = 0; i < dimension; ++i)
-	{
-		dis += sqr(entity_vec[e_a][i] - conceptVec[c_a][i]);
-	}
-	if (dis > sqr(concept_r[c_a]))
-	{
-		for (int j = 0; j < dimension; ++j)
-		{
-			double x = 2 * (entity_vec[e_a][j] - conceptVec[c_a][j]);
-			entity_tmp[e_a][j] -= x * RATE;
-			concept_tmp[c_a][j] -= -1 * x * RATE;
-		}
-		concept_r_tmp[c_a] -= -2 * concept_r[c_a] * RATE;
-	}
-
-	dis = 0;
-	for (int i = 0; i < dimension; ++i)
-	{
-		dis += sqr(entity_vec[e_b][i] - conceptVec[c_b][i]);
-	}
-	if (dis > sqr(concept_r[c_b]))
-	{
-		for (int j = 0; j < dimension; ++j)
-		{
-			double x = 2 * (entity_vec[e_b][j] - conceptVec[c_b][j]);
-			entity_tmp[e_b][j] += x * RATE;
-			concept_tmp[c_b][j] += -1 * x * RATE;
-		}
-		concept_r_tmp[c_b] += -2 * concept_r[c_b] * RATE;
-	}
-}
-
-void gradientSubClassOf(int c1_a, int c2_a, int c1_b, int c2_b)
-{
-	double dis = 0;
-	for (int i = 0; i < dimension; ++i)
-	{
-		dis += sqr(conceptVec[c1_a][i] - conceptVec[c2_a][i]);
-	}
-	if (sqrt(dis) > fabs(concept_r[c1_a] - concept_r[c2_a]))
-	{
-		for (int i = 0; i < dimension; ++i)
-		{
-			double x = 2 * (conceptVec[c1_a][i] - conceptVec[c2_a][i]);
-			concept_tmp[c1_a][i] -= x * RATE;
-			concept_tmp[c2_a][i] -= -x * RATE;
-		}
-		concept_r_tmp[c1_a] -= 2 * concept_r[c1_a] * RATE;
-		concept_r_tmp[c2_a] -= -2 * concept_r[c2_a] * RATE;
-	}
-
-	dis = 0;
-	for (int i = 0; i < dimension; ++i)
-	{
-		dis += sqr(conceptVec[c1_b][i] - conceptVec[c2_b][i]);
-	}
-	if (sqrt(dis) > fabs(concept_r[c1_b] - concept_r[c2_b]))
-	{
-		for (int i = 0; i < dimension; ++i)
-		{
-			double x = 2 * (conceptVec[c1_b][i] - conceptVec[c2_b][i]);
-			concept_tmp[c1_b][i] += x * RATE;
-			concept_tmp[c2_b][i] += -x * RATE;
-		}
-		concept_r_tmp[c1_b] += 2 * concept_r[c1_b] * RATE;
-		concept_r_tmp[c2_b] += -2 * concept_r[c2_b] * RATE;
-	}
-}
-*/
 
 void gradientInverseOf(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b, INT inverseRel)
 {
@@ -591,7 +593,7 @@ void train_kb(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b, INT 
 	else if (isSubclassOf(rel_a))
 	{
 		int cut = 10 - (int)(epoch * sub_cut / trainTimes);
-		//trainSubClassOf(e1_a, e2_a, cut, id);
+		trainSubClassOf(e1_a, e2_a, cut, id);
 	}
 
 	REAL sum1 = calc_sum(e1_a, e2_a, rel_a);
@@ -676,10 +678,12 @@ int train(int triple_index, int id)
 	int j = -1;
 	uint pr;
 
-	if (triple_index > tripleTotal + instanceOf.size())
+	int instanceOf_size = instanceOf.size();
+
+	if (triple_index > tripleTotal + instanceOf_size)
 	{
 		// Triple SubclassOf
-		int idx_sub = triple_index - tripleTotal - instanceOf.size();
+		int idx_sub = triple_index - tripleTotal - instanceOf_size;
 		int h = subClassOf.at(idx_sub).first;
 		int t = subClassOf.at(idx_sub).second;
 
@@ -693,32 +697,33 @@ int train(int triple_index, int id)
 		int t = instanceOf.at(idx_ins).second;
 
 		train_kb(h, t, typeOf_id, 0, 0, typeOf_id, id);
-	}
-
-	// Triple del Training Set
-	if (bernFlag)
-		pr = 1000 * right_mean[trainList[triple_index].r] / (right_mean[trainList[triple_index].r] + left_mean[trainList[triple_index].r]);
-	else
-		pr = 500;
-	if (randd(id) % 1000 < pr || isFunctional(trainList[triple_index].r))
-	{
-		if (hasRange(trainList[triple_index].r))
+	} else {
+		// Triple relazionali
+		if (bernFlag)
+			pr = 1000 * right_mean[trainList[triple_index].r] / (right_mean[trainList[triple_index].r] + left_mean[trainList[triple_index].r]);
+		else
+			pr = 500;
+		if (randd(id) % 1000 < pr || isFunctional(trainList[triple_index].r))
 		{
-			j = getTailCorrupted(triple_index, id);
+			if (hasRange(trainList[triple_index].r))
+			{
+				j = getTailCorrupted(triple_index, id);
+			}
+			if (j == -1)
+				j = corrupt_head(id, trainList[triple_index].h, trainList[triple_index].r);
+			train_kb(trainList[triple_index].h, trainList[triple_index].t, trainList[triple_index].r, trainList[triple_index].h, j, trainList[triple_index].r, id);
 		}
-		if (j == -1)
-			j = corrupt_head(id, trainList[triple_index].h, trainList[triple_index].r);
-		train_kb(trainList[triple_index].h, trainList[triple_index].t, trainList[triple_index].r, trainList[triple_index].h, j, trainList[triple_index].r, id);
-	}
-	else
-	{
-		if (hasDomain(trainList[triple_index].r))
-			j = getHeadCorrupted(triple_index, id);
-		if (j == -1)
-			j = corrupt_tail(id, trainList[triple_index].t, trainList[triple_index].r);
+		else
+		{
+			if (hasDomain(trainList[triple_index].r))
+				j = getHeadCorrupted(triple_index, id);
+			if (j == -1)
+				j = corrupt_tail(id, trainList[triple_index].t, trainList[triple_index].r);
 
-		train_kb(trainList[triple_index].h, trainList[triple_index].t, trainList[triple_index].r, j, trainList[triple_index].t, trainList[triple_index].r, id);
+			train_kb(trainList[triple_index].h, trainList[triple_index].t, trainList[triple_index].r, j, trainList[triple_index].t, trainList[triple_index].r, id);
+		}
 	}
+
 	return j;
 }
 
@@ -740,7 +745,11 @@ void *trainMode(void *con)
 			norm(entityVec + dimension * j);
 		}
 	}
-	pthread_exit(NULL);
+	if(!debug) {
+		pthread_exit(NULL);
+	} else {
+		return NULL;
+	}
 }
 
 void train(void *con)

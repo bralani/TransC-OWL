@@ -9,6 +9,7 @@
     void set_next_random_id(int id);
     unsigned long long randd(int id);
     int rand_max(int id, int x);
+    int rand_max2(int x);
     float rand(float min, float max);
     float normal(float x, float miu, float sigma);
     float randn(float miu, float sigma, float min, float max);

@@ -56,6 +56,7 @@
     inline REAL *relationVec;                               // vettori delle relazioni
     inline REAL *entityVec;                                 // vettori delle delle entità
     inline vector<vector<double> > conceptVec;              // vettori delle classi
+    inline vector<double> concept_r;                        // vettore di supporto per le classi
 
     /** Vettori di supporto per l'addestramento */
     inline map<pair<int, int>, map<int, int>> ok;

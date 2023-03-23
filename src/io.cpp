@@ -338,7 +338,7 @@ void init()
 		left_mean[i] = freqRel[i] / left_mean[i];
 		right_mean[i] = freqRel[i] / right_mean[i];
 	}
-	
+
 	concept_instance.resize(conceptTotal);
 	instance_concept.resize(entityTotal);
 	sub_up_concept.resize(conceptTotal);
@@ -372,6 +372,10 @@ void init()
 		}
 	}
 
+  concept_r.resize(conceptTotal);
+	for(int i = 0; i < conceptTotal; ++i){
+			concept_r[i] = rand(0, 1);
+	}
 
 	owlInit();
 }

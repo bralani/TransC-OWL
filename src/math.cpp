@@ -35,6 +35,13 @@ int rand_max(int id, int x)
 	return res;
 }
 
+int rand_max2(int x){
+    int res = (rand() * rand()) % x;
+    while (res<0)
+        res+=x;
+    return res;
+}
+
 float rand(float min, float max)
 {
 	return min + (max - min) * rand() / (RAND_MAX + 1.0);
