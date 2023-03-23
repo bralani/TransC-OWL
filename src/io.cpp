@@ -427,12 +427,12 @@ void load()
 			tmp = fscanf(fin, "%f", &relationVec[last + j]);
 	}
 	fclose(fin);
-	/*fin = fopen((loadPath + "concept2vec" + note + ".vec").c_str(), "r");
+	fin = fopen((loadPath + "concept2vec" + note + ".vec").c_str(), "r");
 	for (INT i = 0; i < conceptTotal; i++) {
 		for (INT j = 0; j < dimension; j++)
 			tmp = fscanf(fin, "%f", &conceptVec[i][j]);
 	}
-	fclose(fin);*/
+	fclose(fin);
 }
 
 
@@ -442,6 +442,7 @@ void out_binary()
 	REAL *head;
 	FILE *f2 = fopen((outPath + "relation2vec" + note + ".bin").c_str(), "wb");
 	FILE *f3 = fopen((outPath + "entity2vec" + note + ".bin").c_str(), "wb");
+	FILE *f4 = fopen((outPath + "concept2vec" + note + ".bin").c_str(), "wb");
 	len = relationTotal * dimension;
 	tot = 0;
 	head = relationVec;
@@ -460,6 +461,7 @@ void out_binary()
 	}
 	fclose(f2);
 	fclose(f3);
+	fclose(f4);
 }
 
 void out()
@@ -486,14 +488,14 @@ void out()
 			fprintf(f3, "%.6f\t", entityVec[last + ii]);
 		fprintf(f3, "\n");
 	}
-	/*for (int i=0; i<conceptTotal; i++)
+	for (int i=0; i<conceptTotal; i++)
 	{
 		for (int ii=0; ii<dimension; ii++)
 			fprintf(f4,"%.6lf\t",conceptVec[i][ii]);
 		fprintf(f4,"\n");
 		fprintf(f4,"%.6lf\t", concept_r[i]);
 		fprintf(f4,"\n");
-	}*/
+	}
 	fclose(f2);
 	fclose(f3);
 	fclose(f4);

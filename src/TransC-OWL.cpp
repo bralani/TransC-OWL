@@ -585,35 +585,33 @@ int getFalseClass(int entity)
 
 void train_kb(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b, INT id)
 {
-	if (isInstanceOf(rel_a))
-	{
-		int cut = 10 - (int)(epoch * ins_cut / trainTimes);
-		//trainInstanceOf(e1_a, e2_a, cut, id);
-	}
-	else if (isSubclassOf(rel_a))
-	{
+	if (isSubclassOf(rel_a)) {
 		int cut = 10 - (int)(epoch * sub_cut / trainTimes);
 		trainSubClassOf(e1_a, e2_a, cut, id);
+	} else if (isInstanceOf(rel_a)) {
+		int cut = 10 - (int)(epoch * ins_cut / trainTimes);
+		//trainInstanceOf(e1_a, e2_a, cut, id);
+	} else {
+		REAL sum1 = calc_sum(e1_a, e2_a, rel_a);
+		REAL sum2 = calc_sum(e1_b, e2_b, rel_b);
+		if (sum1 + margin > sum2)
+		{
+			res += margin + sum1 - sum2;
+			if (getInverse(rel_a) != -1)
+			{
+				gradientInverseOf(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b, getInverse(rel_a));
+			}
+			else if (getEquivalentProperty(rel_a) != -1)
+			{
+				gradientEquivalentProperty(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b, getEquivalentProperty(rel_a));
+			}
+			else
+			{
+				gradient(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b);
+			}
+		}
 	}
 
-	REAL sum1 = calc_sum(e1_a, e2_a, rel_a);
-	REAL sum2 = calc_sum(e1_b, e2_b, rel_b);
-	if (sum1 + margin > sum2)
-	{
-		res += margin + sum1 - sum2;
-		if (getInverse(rel_a) != -1)
-		{
-			gradientInverseOf(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b, getInverse(rel_a));
-		}
-		else if (getEquivalentProperty(rel_a) != -1)
-		{
-			gradientEquivalentProperty(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b, getEquivalentProperty(rel_a));
-		}
-		else
-		{
-			gradient(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b);
-		}
-	}
 }
 
 int getHeadCorrupted(int triple_index, int id)
@@ -675,55 +673,59 @@ bool hasDomain(int rel)
 // scegli in modo casuale una coda o una testa da corrompere e addestra
 int train(int triple_index, int id)
 {
-	int j = -1;
 	uint pr;
-
+	int testa = -1, coda = -1, relazione = -1, testaB = -1, codaB = -1;
+	int j = -1;
 	int instanceOf_size = instanceOf.size();
 
+	// Triple SubclassOf
 	if (triple_index > tripleTotal + instanceOf_size)
 	{
-		// Triple SubclassOf
 		int idx_sub = triple_index - tripleTotal - instanceOf_size;
-		int h = subClassOf.at(idx_sub).first;
-		int t = subClassOf.at(idx_sub).second;
-
-		train_kb(h, t, -1, 0, 0, -1, id);
+		testa = subClassOf.at(idx_sub).first;
+		relazione = -1;
+		coda = subClassOf.at(idx_sub).second;
 	}
+	// Triple instanceOf
 	else if (triple_index > tripleTotal)
 	{
-		// Triple instanceOf
-		int idx_ins = triple_index - tripleTotal;
-		int h = instanceOf.at(idx_ins).first;
-		int t = instanceOf.at(idx_ins).second;
-
-		train_kb(h, t, typeOf_id, 0, 0, typeOf_id, id);
+		int idx_ins = triple_index - tripleTotal - 1;
+		testa = instanceOf.at(idx_ins).first;
+		relazione = typeOf_id;
+		coda = instanceOf.at(idx_ins).second;
+	// Triple relazionali
 	} else {
-		// Triple relazionali
+		testa = trainList[triple_index].h;
+		relazione = trainList[triple_index].r;
+		coda = trainList[triple_index].t;
+
 		if (bernFlag)
-			pr = 1000 * right_mean[trainList[triple_index].r] / (right_mean[trainList[triple_index].r] + left_mean[trainList[triple_index].r]);
+			pr = 1000 * right_mean[relazione] / (right_mean[relazione] + left_mean[relazione]);
 		else
 			pr = 500;
-		if (randd(id) % 1000 < pr || isFunctional(trainList[triple_index].r))
-		{
-			if (hasRange(trainList[triple_index].r))
-			{
+		
+		if (randd(id) % 1000 < pr || isFunctional(relazione)) {
+			if (hasRange(relazione)) {
 				j = getTailCorrupted(triple_index, id);
 			}
 			if (j == -1)
-				j = corrupt_head(id, trainList[triple_index].h, trainList[triple_index].r);
-			train_kb(trainList[triple_index].h, trainList[triple_index].t, trainList[triple_index].r, trainList[triple_index].h, j, trainList[triple_index].r, id);
-		}
-		else
-		{
-			if (hasDomain(trainList[triple_index].r))
+				j = corrupt_head(id, testa, relazione);
+
+			testaB = testa;
+			codaB = j;
+		} else {
+			if (hasDomain(relazione))
 				j = getHeadCorrupted(triple_index, id);
 			if (j == -1)
-				j = corrupt_tail(id, trainList[triple_index].t, trainList[triple_index].r);
+				j = corrupt_tail(id, coda, relazione);
 
-			train_kb(trainList[triple_index].h, trainList[triple_index].t, trainList[triple_index].r, j, trainList[triple_index].t, trainList[triple_index].r, id);
+			testaB = j;
+			codaB = coda;
 		}
 	}
+	
 
+	train_kb(testa, coda, relazione, testaB, codaB, relazione, id);
 	return j;
 }
 
@@ -780,8 +782,8 @@ void train(void *con)
 		}
 		printf("epoch %d %f %d\n", epoch, res, trainTimes);
 
-		// Salva il modello ogni 50 epoch
-		if (outPath != "" && epoch % 50 == 0)
+		// Salva il modello ogni 100 epoch
+		if (outPath != "" && epoch % 100 == 0)
 		{
 			out();
 		}
