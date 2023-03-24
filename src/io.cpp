@@ -430,9 +430,9 @@ void load()
 	fin = fopen((loadPath + "concept2vec" + note + ".vec").c_str(), "r");
 	for (INT i = 0; i < conceptTotal; i++) {
 		for (INT j = 0; j < dimension; j++)
-			tmp = fscanf(fin, "%f", &conceptVec[i][j]);
+			tmp = fscanf(fin, "%lf", &conceptVec[i][j]);
 		
-		tmp = fscanf(fin, "%.6lf", &concept_r[i]);
+		tmp = fscanf(fin, "%lf", &concept_r[i]);
 	}
 	fclose(fin);
 }

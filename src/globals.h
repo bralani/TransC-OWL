@@ -22,7 +22,7 @@
 
 
     inline const bool debug = false;     // se true crea un solo thread (per permettere il debug)
-    inline int threads = 4;            // numero di thread (funziona solo solo se debug = false)
+    inline int threads = 12;            // numero di thread (funziona solo solo se debug = false)
     inline int trainTimes = 10000;       // trainTimes(epoch) - 1000
     inline int nbatches = 100;	        // batches - 50/100
     inline int epoch;                   // epoch attuale
