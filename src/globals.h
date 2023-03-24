@@ -21,10 +21,10 @@
     inline const string typeOf = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>"; // relazione type (ovvero instanceOf)
 
 
-    inline const bool debug = true;     // se true crea un solo thread (per permettere il debug)
-    inline int threads = 12;            // numero di thread (funziona solo solo se debug = false)
-    inline int trainTimes = 1000;       // trainTimes(epoch) - 1000
-    inline int nbatches = 50;	        // batches - 50/100
+    inline const bool debug = false;     // se true crea un solo thread (per permettere il debug)
+    inline int threads = 4;            // numero di thread (funziona solo solo se debug = false)
+    inline int trainTimes = 10000;       // trainTimes(epoch) - 1000
+    inline int nbatches = 100;	        // batches - 50/100
     inline int epoch;                   // epoch attuale
 
 
@@ -41,7 +41,7 @@
     /* Costanti per salvataggio e caricamento */
     inline string note = "_OWL";            // estensione del file dei vettori (da non modificare)
     inline int loadBinaryFlag = 0;          // flag che indica se caricare i dati da file binari
-    inline string loadPath = "";            // percorso dove caricare i vettori addestrati
+    inline string loadPath = "Output/";            // percorso dove caricare i vettori addestrati
     inline string inPath = "Train/";        // percorso dove prelevare il training set
     inline int outBinaryFlag = 0;           // flag che indica se salvare i dati in file binari
     inline string outPath = "Output/";      // percorso dove salvare i vettori addestrati

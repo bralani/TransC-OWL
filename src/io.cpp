@@ -431,6 +431,8 @@ void load()
 	for (INT i = 0; i < conceptTotal; i++) {
 		for (INT j = 0; j < dimension; j++)
 			tmp = fscanf(fin, "%f", &conceptVec[i][j]);
+		
+		tmp = fscanf(fin, "%.6lf", &concept_r[i]);
 	}
 	fclose(fin);
 }

@@ -251,18 +251,18 @@ void gradient(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b)
 	}
 }
 
-/*
+
 double calcSumInstanceOf(int e, int c){
 	double dis = 0;
 	for(int i = 0; i < dimension; ++i){
-		dis += sqr(entity_vec[e][i] - conceptVec[c][i]);
+		dis += sqr(entityVec[e*dimension+i] - conceptVec[c][i]);
 	}
 	if(dis < sqr(concept_r[c])){
 		return 0;
 	}
 	return dis - sqr(concept_r[c]);
 
-}*/
+}
 
 double calcSumSubClassOf(int c1, int c2){
 	double dis = 0;
@@ -276,20 +276,20 @@ double calcSumSubClassOf(int c1, int c2){
 
 }
 
-/*
+
 void gradientInstanceOf(int e_a, int c_a, int e_b, int c_b)
 {
 	double dis = 0;
 	for (int i = 0; i < dimension; ++i)
 	{
-		dis += sqr(entity_vec[e_a][i] - conceptVec[c_a][i]);
+		dis += sqr(entityVec[e_a*dimension+i] - conceptVec[c_a][i]);
 	}
 	if (dis > sqr(concept_r[c_a]))
 	{
 		for (int j = 0; j < dimension; ++j)
 		{
-			double x = 2 * (entity_vec[e_a][j] - conceptVec[c_a][j]);
-			entity_tmp[e_a][j] -= x * RATE;
+			double x = 2 * (entityVec[e_a*dimension+j] - conceptVec[c_a][j]);
+			entityVec[e_a*dimension+j] -= x * RATE;
 			conceptVec[c_a][j] -= -1 * x * RATE;
 		}
 		concept_r[c_a] -= -2 * concept_r[c_a] * RATE;
@@ -298,19 +298,19 @@ void gradientInstanceOf(int e_a, int c_a, int e_b, int c_b)
 	dis = 0;
 	for (int i = 0; i < dimension; ++i)
 	{
-		dis += sqr(entity_vec[e_b][i] - conceptVec[c_b][i]);
+		dis += sqr(entityVec[e_b*dimension+i] - conceptVec[c_b][i]);
 	}
 	if (dis > sqr(concept_r[c_b]))
 	{
 		for (int j = 0; j < dimension; ++j)
 		{
-			double x = 2 * (entity_vec[e_b][j] - conceptVec[c_b][j]);
-			entity_tmp[e_b][j] += x * RATE;
+			double x = 2 * (entityVec[e_b*dimension+j] - conceptVec[c_b][j]);
+			entityVec[e_b*dimension+j] += x * RATE;
 			conceptVec[c_b][j] += -1 * x * RATE;
 		}
 		concept_r[c_b] += -2 * concept_r[c_b] * RATE;
 	}
-}*/
+}
 
 void gradientSubClassOf(int c1_a, int c2_a, int c1_b, int c2_b)
 {
@@ -349,7 +349,7 @@ void gradientSubClassOf(int c1_a, int c2_a, int c1_b, int c2_b)
 	}
 }
 
-/*
+
 void doTrainInstanceOf(int e_a, int c_a, int e_b, int c_b)
 {
 	double sum1 = calcSumInstanceOf(e_a, c_a);
@@ -359,7 +359,7 @@ void doTrainInstanceOf(int e_a, int c_a, int e_b, int c_b)
 		res += (margin_instance + sum1 - sum2);
 		gradientInstanceOf(e_a, c_a, e_b, c_b);
 	}
-}*/
+}
 
 void doTrainSubClassOf(int c1_a, int c2_a, int c1_b, int c2_b)
 {
@@ -372,7 +372,7 @@ void doTrainSubClassOf(int c1_a, int c2_a, int c1_b, int c2_b)
 	}
 }
 
-/*
+
 void trainInstanceOf(int head, int tail, int cut, int id)
 {
 	
@@ -399,7 +399,7 @@ void trainInstanceOf(int head, int tail, int cut, int id)
 			}
 		} while (instanceOf_ok.count(make_pair(j, tail)) > 0);
 		doTrainInstanceOf(head, tail, j, tail);
-		normV(entity_tmp[j]);
+		norm(entityVec + dimension * j);
 	}
 	else
 	{
@@ -426,10 +426,13 @@ void trainInstanceOf(int head, int tail, int cut, int id)
 		normV(conceptVec[j]);
 		normR(concept_r[j]);
 	}
-	normV(entity_tmp[head]);
+
+	norm(entityVec + dimension * head);
+	norm(entityVec + dimension * tail);
+	norm(entityVec + dimension * j);
 	normV(conceptVec[tail]);
 	normR(concept_r[tail]);
-} */
+}
 
 void trainSubClassOf(int head, int tail, int cut, int id)
 {
@@ -590,7 +593,7 @@ void train_kb(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b, INT 
 		trainSubClassOf(e1_a, e2_a, cut, id);
 	} else if (isInstanceOf(rel_a)) {
 		int cut = 10 - (int)(epoch * ins_cut / trainTimes);
-		//trainInstanceOf(e1_a, e2_a, cut, id);
+		trainInstanceOf(e1_a, e2_a, cut, id);
 	} else {
 		REAL sum1 = calc_sum(e1_a, e2_a, rel_a);
 		REAL sum2 = calc_sum(e1_b, e2_b, rel_b);
