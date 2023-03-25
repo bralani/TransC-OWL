@@ -244,6 +244,7 @@ void init()
 	fclose(fin);
 
 	entityVec = (REAL *)calloc(entityTotal * dimension, sizeof(REAL));
+	entity_tmp = (REAL *)calloc(entityTotal * dimension, sizeof(REAL));
 	for (INT i = 0; i < entityTotal; i++)
 	{
 		for (INT ii = 0; ii < dimension; ii++)

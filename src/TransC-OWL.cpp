@@ -216,7 +216,7 @@ REAL calc_sum(INT e1, INT e2, INT rel)
 	INT last2 = e2 * dimension;
 	INT lastr = rel * dimension;
 	for (INT ii = 0; ii < dimension; ii++)
-		sum += fabs(entityVec[last2 + ii] - entityVec[last1 + ii] - relationVec[lastr + ii]);
+		sum += fabs(entity_tmp[last2 + ii] - entity_tmp[last1 + ii] - relationVec[lastr + ii]);
 	return sum;
 }
 
@@ -232,22 +232,22 @@ void gradient(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT rel_b)
 	for (INT ii = 0; ii < dimension; ii++)
 	{
 		REAL x;
-		x = (entityVec[lasta2 + ii] - entityVec[lasta1 + ii] - relationVec[lastar + ii]);
+		x = (entity_tmp[lasta2 + ii] - entity_tmp[lasta1 + ii] - relationVec[lastar + ii]);
 		if (x > 0)
 			x = -alpha;
 		else
 			x = alpha;
 		relationVec[lastar + ii] -= x;
-		entityVec[lasta1 + ii] -= x;
-		entityVec[lasta2 + ii] += x;
-		x = (entityVec[lastb2 + ii] - entityVec[lastb1 + ii] - relationVec[lastbr + ii]);
+		entity_tmp[lasta1 + ii] -= x;
+		entity_tmp[lasta2 + ii] += x;
+		x = (entity_tmp[lastb2 + ii] - entity_tmp[lastb1 + ii] - relationVec[lastbr + ii]);
 		if (x > 0)
 			x = alpha;
 		else
 			x = -alpha;
 		relationVec[lastbr + ii] -= x;
-		entityVec[lastb1 + ii] -= x;
-		entityVec[lastb2 + ii] += x;
+		entity_tmp[lastb1 + ii] -= x;
+		entity_tmp[lastb2 + ii] += x;
 	}
 }
 
@@ -289,7 +289,7 @@ void gradientInstanceOf(int e_a, int c_a, int e_b, int c_b)
 		for (int j = 0; j < dimension; ++j)
 		{
 			double x = 2 * (entityVec[e_a*dimension+j] - conceptVec[c_a][j]);
-			entityVec[e_a*dimension+j] -= x * RATE;
+			entity_tmp[e_a*dimension+j] -= x * RATE;
 			conceptVec[c_a][j] -= -1 * x * RATE;
 		}
 		concept_r[c_a] -= -2 * concept_r[c_a] * RATE;
@@ -305,7 +305,7 @@ void gradientInstanceOf(int e_a, int c_a, int e_b, int c_b)
 		for (int j = 0; j < dimension; ++j)
 		{
 			double x = 2 * (entityVec[e_b*dimension+j] - conceptVec[c_b][j]);
-			entityVec[e_b*dimension+j] += x * RATE;
+			entity_tmp[e_b*dimension+j] += x * RATE;
 			conceptVec[c_b][j] += -1 * x * RATE;
 		}
 		concept_r[c_b] += -2 * concept_r[c_b] * RATE;
@@ -399,7 +399,7 @@ void trainInstanceOf(int head, int tail, int cut, int id)
 			}
 		} while (instanceOf_ok.count(make_pair(j, tail)) > 0);
 		doTrainInstanceOf(head, tail, j, tail);
-		norm(entityVec + dimension * j);
+        norm(entity_tmp + dimension * j);
 	}
 	else
 	{
@@ -427,9 +427,9 @@ void trainInstanceOf(int head, int tail, int cut, int id)
 		normR(concept_r[j]);
 	}
 
-	norm(entityVec + dimension * head);
-	norm(entityVec + dimension * tail);
-	norm(entityVec + dimension * j);
+	norm(entity_tmp + dimension * head);
+	norm(entity_tmp + dimension * tail);
+	norm(entity_tmp + dimension * j);
 	normV(conceptVec[tail]);
 	normR(concept_r[tail]);
 }
@@ -505,32 +505,32 @@ void gradientInverseOf(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_b, INT re
 	for (INT ii = 0; ii < dimension; ii++)
 	{
 		REAL x;
-		x = (entityVec[lasta2 + ii] - entityVec[lasta1 + ii] - relationVec[lastar + ii]);
+		x = (entity_tmp[lasta2 + ii] - entity_tmp[lasta1 + ii] - relationVec[lastar + ii]);
 		if (x > 0)
 			x = -alpha;
 		else
 			x = alpha;
 
 		relationVec[lastar + ii] -= x;
-		entityVec[lasta1 + ii] -= x;
-		entityVec[lasta2 + ii] += x;
+		entity_tmp[lasta1 + ii] -= x;
+		entity_tmp[lasta2 + ii] += x;
 
 		relationVec[lastInverse + ii] -= x;
-		entityVec[lasta2 + ii] -= x;
-		entityVec[lasta1 + ii] += x;
+		entity_tmp[lasta2 + ii] -= x;
+		entity_tmp[lasta1 + ii] += x;
 
-		x = (entityVec[lastb2 + ii] - entityVec[lastb1 + ii] - relationVec[lastbr + ii]);
+		x = (entity_tmp[lastb2 + ii] - entity_tmp[lastb1 + ii] - relationVec[lastbr + ii]);
 		if (x > 0)
 			x = alpha;
 		else
 			x = -alpha;
 		relationVec[lastbr + ii] -= x;
-		entityVec[lastb1 + ii] -= x;
-		entityVec[lastb2 + ii] += x;
+		entity_tmp[lastb1 + ii] -= x;
+		entity_tmp[lastb2 + ii] += x;
 
 		relationVec[lastInverse + ii] -= x;
-		entityVec[lastb2 + ii] -= x;
-		entityVec[lastb1 + ii] += x;
+		entity_tmp[lastb2 + ii] -= x;
+		entity_tmp[lastb1 + ii] += x;
 	}
 }
 
@@ -547,24 +547,24 @@ void gradientEquivalentProperty(INT e1_a, INT e2_a, INT rel_a, INT e1_b, INT e2_
 	for (INT ii = 0; ii < dimension; ii++)
 	{
 		REAL x;
-		x = (entityVec[lasta2 + ii] - entityVec[lasta1 + ii] - relationVec[lastar + ii]);
+		x = (entity_tmp[lasta2 + ii] - entity_tmp[lasta1 + ii] - relationVec[lastar + ii]);
 		if (x > 0)
 			x = -alpha;
 		else
 			x = alpha;
 		relationVec[lastar + ii] -= x;
 		relationVec[lastEquivalent + ii] -= x;
-		entityVec[lasta1 + ii] -= x;
-		entityVec[lasta2 + ii] += x;
-		x = (entityVec[lastb2 + ii] - entityVec[lastb1 + ii] - relationVec[lastbr + ii]);
+		entity_tmp[lasta1 + ii] -= x;
+		entity_tmp[lasta2 + ii] += x;
+		x = (entity_tmp[lastb2 + ii] - entity_tmp[lastb1 + ii] - relationVec[lastbr + ii]);
 		if (x > 0)
 			x = alpha;
 		else
 			x = -alpha;
 		relationVec[lastbr + ii] -= x;
 		relationVec[lastEquivalent + ii] -= x;
-		entityVec[lastb1 + ii] -= x;
-		entityVec[lastb2 + ii] += x;
+		entity_tmp[lastb1 + ii] -= x;
+		entity_tmp[lastb2 + ii] += x;
 	}
 }
 
@@ -737,6 +737,12 @@ void *trainMode(void *con)
 	INT id, index, j;
 	id = (unsigned long long)(con);
 	set_next_random_id(id);
+
+
+    std::memcpy(entity_tmp, entityVec, entityTotal * dimension * sizeof(REAL));
+	//concept_tmp = concept_vec;
+	//concept_r_tmp = concept_r;
+
 	for (INT k = Batch / threads; k >= 0; k--)
 	{
 		index = rand_max(id, trainSize); // ottieni un indice casuale
@@ -745,11 +751,16 @@ void *trainMode(void *con)
 		if (index < tripleTotal)
 		{
 			norm(relationVec + dimension * trainList[index].r);
-			norm(entityVec + dimension * trainList[index].h);
-			norm(entityVec + dimension * trainList[index].t);
-			norm(entityVec + dimension * j);
+			norm(entity_tmp + dimension * trainList[index].h);
+			norm(entity_tmp + dimension * trainList[index].t);
+			norm(entity_tmp + dimension * j);
 		}
 	}
+	
+    std::memcpy(entityVec, entity_tmp, entityTotal * dimension * sizeof(REAL));
+	//conceptVec = concept_tmp;
+	//concept_r = concept_r_tmp;
+
 	if(!debug) {
 		pthread_exit(NULL);
 	} else {

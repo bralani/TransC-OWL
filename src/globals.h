@@ -21,8 +21,8 @@
     inline const string typeOf = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>"; // relazione type (ovvero instanceOf)
 
 
-    inline const bool debug = false;     // se true crea un solo thread (per permettere il debug)
-    inline int threads = 12;            // numero di thread (funziona solo solo se debug = false)
+    inline const bool debug = true;     // se true crea un solo thread (per permettere il debug)
+    inline int threads = 1;            // numero di thread (funziona solo solo se debug = false)
     inline int trainTimes = 10000;       // trainTimes(epoch) - 1000
     inline int nbatches = 100;	        // batches - 50/100
     inline int epoch;                   // epoch attuale
@@ -54,7 +54,7 @@
     /** Vettori da addestrare(output) */
     inline INT relationTotal, entityTotal, conceptTotal;    // numero di relazioni, entità e classi
     inline REAL *relationVec;                               // vettori delle relazioni
-    inline REAL *entityVec;                                 // vettori delle delle entità
+    inline REAL *entityVec, *entity_tmp;                    // vettori delle delle entità
     inline vector<vector<double> > conceptVec;              // vettori delle classi
     inline vector<double> concept_r;                        // vettore di supporto per le classi
 
