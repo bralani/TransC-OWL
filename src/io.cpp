@@ -272,9 +272,34 @@ void init()
 
 	fin = fopen((inPath + "train2id.txt").c_str(), "r");
 	tmp = fscanf(fin, "%d", &tripleTotal);
+
+	trainList = (Triple *)calloc(tripleTotal, sizeof(Triple));
+	int totTriples = tripleTotal;
+	for (INT i = 0; i < totTriples; i++)
+	{
+		int testa, coda, relazione;
+		tmp = fscanf(fin, "%d", &testa);
+		tmp = fscanf(fin, "%d", &coda);
+		tmp = fscanf(fin, "%d", &relazione);
+		if (relazione != typeOf_id)
+		{
+			trainList[i].h = testa;
+			trainList[i].t = coda;
+			trainList[i].r = relazione;
+		} else {
+			i--;
+			tripleTotal--;
+		}
+	}
+	fclose(fin);
+
+	printf("%d", trainList[0].r);
+
+	fin = fopen((inPath + "train2id.txt").c_str(), "r");
+	tmp = fscanf(fin, "%d", &tmp);
+
 	trainHead = (Triple *)calloc(tripleTotal, sizeof(Triple));
 	trainTail = (Triple *)calloc(tripleTotal, sizeof(Triple));
-	trainList = (Triple *)calloc(tripleTotal, sizeof(Triple));
 	for (INT i = 0; i < tripleTotal; i++)
 	{
 		tmp = fscanf(fin, "%d", &trainList[i].h);
