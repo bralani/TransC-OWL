@@ -27,6 +27,8 @@ using namespace std;
 
 #define pi 3.1415926535897932384626433832795
 
+string loadPath = "Output/";            // percorso dove caricare i vettori addestrati
+
 map<int, int> inverse;
 map<int, int> equivalentRel;
 bool L1Flag = true;
@@ -118,6 +120,34 @@ public:
     void addInstanceOf(int instance, int concept){
         instanceOf.emplace_back(instance, concept);
         instanceOf_ok[make_pair(instance, concept)] = 1;
+    }
+
+    void load()
+    {
+        FILE *fin;
+        int tmp;
+        fin = fopen((loadPath + "entity2vec_OWL.vec").c_str(), "r");
+        for (int i = 0; i < entity_num; i++)
+        {
+            for (int j = 0; j < n; j++)
+                tmp = fscanf(fin, "%lf", &entity_vec[i][j]);
+        }
+        fclose(fin);
+        fin = fopen((loadPath + "relation2vec_OWL.vec").c_str(), "r");
+        for (int i = 0; i < relation_num; i++)
+        {
+            for (int j = 0; j < n; j++)
+                tmp = fscanf(fin, "%lf", &relation_vec[i][j]);
+        }
+        fclose(fin);
+        fin = fopen((loadPath + "concept2vec_OWL.vec").c_str(), "r");
+        for (int i = 0; i < concept_num; i++) {
+            for (int j = 0; j < n; j++)
+                tmp = fscanf(fin, "%lf", &concept_vec[i][j]);
+            
+            tmp = fscanf(fin, "%lf", &concept_r[i]);
+        }
+        fclose(fin);
     }
 
     void setup(unsigned int n_in, double rate_in, double margin_in, double margin_ins, double margin_sub){
@@ -838,5 +868,6 @@ int main(int argc, char** argv){
         cout << "bern = " << "False" << endl;
     prepare();
     train.setup(n, rate, margin, margin_ins, margin_sub);
+	if (loadPath != "") train.load();
     train.doTrain();
 }
