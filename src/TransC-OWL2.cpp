@@ -793,7 +793,7 @@ void prepare(){
 	}
 	instanceOf_file.close();
 
-	ifstream subclassOf_file("data/" + dataSet + "/Train/subclassOf2id.txt");
+	ifstream subclassOf_file("data/" + dataSet + "/Train/subclassof.txt");
 	while (getline(subclassOf_file, tmpStr))
 	{
 		int pos = tmpStr.find(' ', 0);
