@@ -778,34 +778,19 @@ void prepare(){
 	}
 	ent_file.close();
 
-	ifstream instanceOf_file("data/" + dataSet + "/Train/instanceOf2id.txt");
-	string tmpStr;
-	while (getline(instanceOf_file, tmpStr))
-	{
-		int pos = tmpStr.find(' ', 0);
-		string a1 = tmpStr.substr(0, pos);
-		string b1 = tmpStr.substr(pos + 1);
-		int a = ent2id.find(a1)->second;
-		int b = ent2id.find(b1)->second;
-		train.addInstanceOf(a, b);
-		instance_concept[a].push_back(b);
-		concept_instance[b].push_back(a);
-	}
-	instanceOf_file.close();
-
-	ifstream subclassOf_file("data/" + dataSet + "/Train/subclassof.txt");
-	while (getline(subclassOf_file, tmpStr))
-	{
-		int pos = tmpStr.find(' ', 0);
-		string a1 = tmpStr.substr(0, pos);
-		string b1 = tmpStr.substr(pos + 1);
-		int a = class2id.find(a1)->second;
-		int b = class2id.find(b1)->second;
-		train.addSubClassOf(a, b);
-		sub_up_concept[a].push_back(b);
-		up_sub_concept[b].push_back(a);
-	}
-	subclassOf_file.close();
+    FILE* instanceOf_file = fopen(("data/" + dataSet + "/Train/instanceOf2id.txt").c_str(), "r");
+    FILE* subClassOf_file = fopen(("data/" + dataSet + "/Train/subClassOf2id.txt").c_str(), "r");
+    int a = 0, b = 0;
+	while(fscanf(instanceOf_file, "%d%d", &a, &b) == 2){
+        train.addInstanceOf(a, b);
+        instance_concept[a].push_back(b);
+        concept_instance[b].push_back(a);
+    }
+    while(fscanf(subClassOf_file, "%d%d", &a, &b) == 2){
+        train.addSubClassOf(a, b);
+        sub_up_concept[a].push_back(b);
+        up_sub_concept[b].push_back(a);
+    }
 
 
 	ifstream eqProp_file("data/" + dataSet + "/Train/equivalentProperty.txt");
