@@ -11,10 +11,7 @@
 #include <cmath>
 #include <string>
 #include <algorithm>
-#include <pthread.h>
-#include <sys/mman.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <sys/stat.h>
 #include <map>
 #include <fstream>
@@ -96,6 +93,35 @@ vector<vector<int> > up_sub_concept;
 vector<vector<int> > concept_brother;
 map<int,map<int,int> > left_entity, right_entity;
 map<int,double> left_num, right_num;
+int *lefHead, *rigHead;
+int *lefTail, *rigTail;
+double *left_mean, *right_mean;
+multimap<int, int> rel2range;	// mappa una relazione nel range, che corrisponde ad una classe
+multimap<int, int> rel2domain;	// mappa una relazione nel domain, che corrisponde ad una classe
+list<int> functionalRel;
+
+struct Triple
+{
+    int h, r, t;
+};
+
+Triple *trainHead, *trainTail, *trainList;
+
+struct cmp_head
+{
+    bool operator()(const Triple &a, const Triple &b)
+    {
+        return (a.h < b.h) || (a.h == b.h && a.r < b.r) || (a.h == b.h && a.r == b.r && a.t < b.t);
+    }
+};
+
+struct cmp_tail
+{
+    bool operator()(const Triple &a, const Triple &b)
+    {
+        return (a.t < b.t) || (a.t == b.t && a.r < b.r) || (a.t == b.t && a.r == b.r && a.h < b.h);
+    }
+};
 
 class Train{
 public:
@@ -292,42 +318,205 @@ private:
     vector<vector<double> > relation_tmp, entity_tmp, concept_tmp;
     vector<double> concept_r, concept_r_tmp;
 
-    void trainHLR(int i, int cut){
-        int j; double pr = 500;
-        if(bern) pr = 1000 * right_num[fb_r[i]] / (right_num[fb_r[i]] + left_num[fb_r[i]]);
-        if(rand() % 1000 < pr){
-            do{
-                if(!instance_brother[fb_l[i]].empty()){
-                    if(rand() % 10 < cut){
-                        j = randMax(entity_num);
-                    }else{
-                        j = rand() % (int)instance_brother[fb_l[i]].size();
-                        j = instance_brother[fb_l[i]][j];
-                    }
-                }else{
-                    j = randMax(entity_num);
-                }
-            }while(ok[make_pair(fb_h[i],fb_r[i])].count(j)>0);
-            doTrainHLR(fb_h[i],fb_l[i],fb_r[i],fb_h[i],j,fb_r[i]);
-        }else{
-            do{
-                if(!instance_brother[fb_h[i]].empty()){
-                    if(rand() % 10 < cut){
-                        j = randMax(entity_num);
-                    }else{
-                        j = rand() % (int)instance_brother[fb_h[i]].size();
-                        j = instance_brother[fb_h[i]][j];
-                    }
-                }else{
-                    j = randMax(entity_num);
-                }
-            }while (ok[make_pair(j,fb_r[i])].count(fb_l[i])>0);
-            doTrainHLR(fb_h[i],fb_l[i],fb_r[i],j,fb_l[i],fb_r[i]);
-        }
+    void trainHLR(int i, int cut) {
+        int testa = fb_h[i];
+        int coda = fb_l[i];
+        int relazione = fb_r[i];
+
+        pair<int, int> corrupt_pair = corrupt(i, testa, coda, relazione);
+
+        int testaB = corrupt_pair.first;
+        int codaB = corrupt_pair.second;
+
+        doTrainHLR(testa, coda, relazione, testaB, codaB, relazione);
+
         norm(relation_tmp[fb_r[i]]);
         norm(entity_tmp[fb_h[i]]);
         norm(entity_tmp[fb_l[i]]);
-        norm(entity_tmp[j]);
+        norm(entity_tmp[testaB]);
+        norm(entity_tmp[codaB]);
+    }
+
+    // vero se la relazione è di tipo functional
+    bool isFunctional(int rel_id)
+    {
+        if (functionalRel.size() == 0)
+            return false;
+        for (list<int>::iterator it = functionalRel.begin(); it != functionalRel.end(); ++it)
+            if ((*it) == rel_id)
+                return true;
+        return false;
+    }
+
+    bool hasRange(int rel)
+    {
+        pair<std::multimap<int, int>::iterator, multimap<int, int>::iterator> ret;
+        ret = rel2range.equal_range(rel);
+        return (rel2range.count(rel) > 0);
+    }
+
+    bool hasDomain(int rel)
+    {
+        pair<std::multimap<int, int>::iterator, multimap<int, int>::iterator> ret;
+        ret = rel2range.equal_range(rel);
+        return (rel2domain.count(rel) > 0);
+    }
+
+    pair<int, int> corrupt(int id, int testa, int coda, int relazione) {
+        int testaB, codaB, j; 
+        double pr = 500;
+        if(bern) pr = 1000 * right_num[relazione] / (right_num[relazione] + left_num[relazione]);
+
+        if (rand() % 1000 < pr || isFunctional(relazione)) {
+			if (hasRange(relazione)) {
+				j = getTailCorrupted(relazione, coda);
+			}
+			if (j == -1)
+				j = corrupt_entity(testa, relazione, true);
+
+			testaB = testa;
+			codaB = j;
+		} else {
+			if (hasDomain(relazione))
+				j = getHeadCorrupted(relazione, testa);
+			if (j == -1)
+				j = corrupt_entity(coda, relazione, false);
+
+			testaB = j;
+			codaB = coda;
+		}
+
+        //restituisce un pair con testaB e codaB
+        return make_pair(testaB, codaB);
+    }
+
+    // vero se l'entità index è di classe class_id
+    bool inRange(int id_rel, int id_obj)
+    {
+        // prendi le classi di id_obj!!
+        auto it_range = std::equal_range(instanceOf.begin(), instanceOf.end(), std::make_pair(id_obj, 0.0));
+        set<int> cls;
+        for (auto it = it_range.first; it != it_range.second; ++it) {
+            cls.insert(it->second);
+        }
+
+        pair<std::multimap<int, int>::iterator, multimap<int, int>::iterator> ret;
+        ret = rel2range.equal_range(id_rel);
+        for (multimap<int, int>::iterator it = ret.first; it != ret.second; ++it)
+            if (cls.find(it->second) != cls.end())
+                return true;
+
+        return false;
+    }
+
+    bool inDomain(int id_rel, int id_sub)
+    {
+        // prendi le classi di id_sub!!
+        auto it_range = std::equal_range(instanceOf.begin(), instanceOf.end(), std::make_pair(id_sub, 0.0));
+        set<int> cls;
+        for (auto it = it_range.first; it != it_range.second; ++it) {
+            cls.insert(it->second);
+        }
+
+        pair<std::multimap<int, int>::iterator, multimap<int, int>::iterator> ret;
+        ret = rel2domain.equal_range(id_rel);
+        for (multimap<int, int>::iterator it = ret.first; it != ret.second; ++it)
+            if (cls.find(it->second) != cls.end())
+                return true;
+
+        return false;
+    }
+
+    int getHeadCorrupted(int relazione, int testa)
+    {
+        int j = -1;
+        // Formula di Slovin per la dimensione del campione (generati da corrupt_tail)
+        float error = 0.2f; // margine di errore del 20%
+        int tries = entity_num / (1 + entity_num * error * error);
+        for (int i = 0; i < tries; i++)
+        {
+            int corrupt_head = corrupt_entity(testa, relazione, true);
+            if (!inDomain(relazione, corrupt_head))
+            {
+                j = corrupt_head;
+                break;
+            }
+        }
+        return j;
+    }
+
+    int getTailCorrupted(int relazione, int coda)
+    {
+        int j = -1;
+        // Formula di Slovin per la dimensione del campione (generati da corrupt_tail)
+        float error = 0.2f; // margine di errore del 20%
+        int tries = entity_num / (1 + entity_num * error * error);
+        for (int i = 0; i < tries; i++)
+        {
+            int corrupt_tail = corrupt_entity(coda, relazione, false);
+            if (!inRange(relazione, corrupt_tail))
+            {
+                j = corrupt_tail;
+                break;
+            }
+        }
+        return j;
+    }
+    
+    int corrupt_entity(int h, int r, bool head)
+    {
+        Triple *trainTR;
+        int *lefTR, *rigTR;
+
+        if(head)
+        {
+            lefTR = lefHead;
+            rigTR = rigHead;
+            trainTR = trainHead;
+        } else {
+            lefTR = lefTail;
+            rigTR = rigTail;
+            trainTR = trainTail;
+        }
+
+        int lef, rig, mid, ll, rr;
+        lef = lefTR[h] - 1;
+        rig = rigTR[h];
+        while (lef + 1 < rig)
+        {
+            mid = (lef + rig) >> 1;
+            if (trainTR[mid].r >= r)
+                rig = mid;
+            else
+                lef = mid;
+        }
+        ll = rig;
+        lef = lefTR[h];
+        rig = rigTR[h] + 1;
+        while (lef + 1 < rig)
+        {
+            mid = (lef + rig) >> 1;
+            if (trainTR[mid].r <= r)
+                lef = mid;
+            else
+                rig = mid;
+        }
+        rr = lef;
+        int tmp = randMax(entity_num - (rr - ll + 1));
+        if (tmp < trainTR[ll].t)
+            return tmp;
+        if (tmp > trainTR[rr].t - rr + ll - 1)
+            return tmp + rr - ll + 1;
+        lef = ll, rig = rr + 1;
+        while (lef + 1 < rig)
+        {
+            mid = (lef + rig) >> 1;
+            if (trainTR[mid].t - mid + ll - 1 < tmp)
+                lef = mid;
+            else
+                rig = mid;
+        }
+        return tmp + lef - ll + 1;
     }
 
     void trainInstanceOf(int i, int cut){
@@ -681,13 +870,67 @@ void prepare(){
     fscanf(f3, "%d", &concept_num);
     fscanf(f_kb, "%d", &triple_num);
     int h, t, l;
+
+	trainHead = (Triple *)calloc(triple_num, sizeof(Triple));
+	trainTail = (Triple *)calloc(triple_num, sizeof(Triple));
+    int i = 0;
     while (fscanf(f_kb, "%d%d%d", &h, &t, &l) == 3) {
         train.addHrt(h, t, l);
         if(bern){
             left_entity[l][h]++;
             right_entity[l][t]++;
         }
+
+		trainHead[i].h = h;
+		trainHead[i].r = l;
+		trainHead[i].t = t;
+		trainTail[i].h = h;
+		trainTail[i].r = l;
+		trainTail[i].t = t;
+        i++;
     }
+
+	sort(trainHead, trainHead + triple_num, cmp_head());
+	sort(trainTail, trainTail + triple_num, cmp_tail());
+
+	lefHead = (int *)calloc(entity_num, sizeof(int));
+	rigHead = (int *)calloc(entity_num, sizeof(int));
+	lefTail = (int *)calloc(entity_num, sizeof(int));
+	rigTail = (int *)calloc(entity_num, sizeof(int));
+	memset(rigHead, -1, sizeof(int) * entity_num);
+	memset(rigTail, -1, sizeof(int) * entity_num);
+	for (int i = 1; i < triple_num; i++)
+	{
+		if (trainTail[i].t != trainTail[i - 1].t)
+		{
+			rigTail[trainTail[i - 1].t] = i - 1;
+			lefTail[trainTail[i].t] = i;
+		}
+		if (trainHead[i].h != trainHead[i - 1].h)
+		{
+			rigHead[trainHead[i - 1].h] = i - 1;
+			lefHead[trainHead[i].h] = i;
+		}
+	}
+	rigHead[trainHead[triple_num - 1].h] = triple_num - 1;
+	rigTail[trainTail[triple_num - 1].t] = triple_num - 1;
+
+	left_mean = (double *)calloc(relation_num * 2, sizeof(double));
+	right_mean = left_mean + relation_num;
+	for (int i = 0; i < entity_num; i++)
+	{
+		for (int j = lefHead[i] + 1; j <= rigHead[i]; j++)
+			if (trainHead[j].r != trainHead[j - 1].r)
+				left_mean[trainHead[j].r] += 1.0;
+		if (lefHead[i] <= rigHead[i])
+			left_mean[trainHead[lefHead[i]].r] += 1.0;
+		for (int j = lefTail[i] + 1; j <= rigTail[i]; j++)
+			if (trainTail[j].r != trainTail[j - 1].r)
+				right_mean[trainTail[j].r] += 1.0;
+		if (lefTail[i] <= rigTail[i])
+			right_mean[trainTail[lefTail[i]].r] += 1.0;
+	}
+
     fclose(f_kb);
     fclose(f1);
     fclose(f2);
