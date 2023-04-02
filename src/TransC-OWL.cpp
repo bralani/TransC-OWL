@@ -24,9 +24,12 @@ using namespace std;
 
 #define pi 3.1415926535897932384626433832795
 
-string loadPath = "Output";            // percorso dove caricare i vettori addestrati
-const string type_of = "<http://dbpedia.org/ontology/type>";
-int typeOf_id = 0;
+bool OWL = false;                 // indica se far partire l'algoritmo transC-OWL o transC
+bool loadPath = false;            // indica se caricare i vettori già addestrati
+
+string note = "";
+const string typeOf = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>";
+int typeOf_id;
 
 map<int, int> inverse;
 map<int, int> equivalentRel;
@@ -34,7 +37,7 @@ bool L1Flag = true;
 bool bern = false;
 double ins_cut = 8.0;
 double sub_cut = 8.0;
-string dataSet = "";
+string dataSet = "DBpedia15K/";
 
 double rand(double min, double max){
     return min + (max - min) * rand() / (RAND_MAX + 1.0);
@@ -154,21 +157,21 @@ public:
     {
         FILE *fin;
         int tmp;
-        fin = fopen((loadPath + "/entity2vec_OWL.vec").c_str(), "r");
+        fin = fopen(("../data/" + dataSet + "Output/entity2vec" + note + ".vec").c_str(), "r");
         for (int i = 0; i < entity_num; i++)
         {
             for (int j = 0; j < n; j++)
                 tmp = fscanf(fin, "%lf", &entity_vec[i][j]);
         }
         fclose(fin);
-        fin = fopen((loadPath + "/relation2vec_OWL.vec").c_str(), "r");
+        fin = fopen(("../data/" + dataSet + "Output/relation2vec" + note + ".vec").c_str(), "r");
         for (int i = 0; i < relation_num; i++)
         {
             for (int j = 0; j < n; j++)
                 tmp = fscanf(fin, "%lf", &relation_vec[i][j]);
         }
         fclose(fin);
-        fin = fopen((loadPath + "/concept2vec_OWL.vec").c_str(), "r");
+        fin = fopen(("../data/" + dataSet + "Output/concept2vec" + note + ".vec").c_str(), "r");
         for (int i = 0; i < concept_num; i++) {
             for (int j = 0; j < n; j++)
                 tmp = fscanf(fin, "%lf", &concept_vec[i][j]);
@@ -280,9 +283,9 @@ public:
                 cout<<"epoch:"<<epoch<<' '<<res<<endl;
             }
             if(epoch % 100 == 0 || epoch == nepoch - 1){
-                FILE* f2 = fopen(("Output/relation2vec_OWL.vec"), "w");
-                FILE* f3 = fopen(("Output/entity2vec_OWL.vec"), "w");
-                FILE* f4 = fopen(("Output/concept2vec_OWL.vec"), "w");
+                FILE* f2 = fopen(("../data/" + dataSet + "Output/relation2vec" + note + ".vec").c_str(), "w");
+                FILE* f3 = fopen(("../data/" + dataSet + "Output/entity2vec" + note + ".vec").c_str(), "w");
+                FILE* f4 = fopen(("../data/" + dataSet + "Output/concept2vec" + note + ".vec").c_str(), "w");
                 for (int i=0; i<relation_num; i++)
                 {
                     for (int ii=0; ii<n; ii++)
@@ -359,188 +362,6 @@ private:
         norm(entity_tmp[fb_h[i]]);
         norm(entity_tmp[fb_l[i]]);
         norm(entity_tmp[j]);
-    }
-
-    // vero se la relazione è di tipo functional
-    bool isFunctional(int rel_id)
-    {
-        if (functionalRel.size() == 0)
-            return false;
-        for (list<int>::iterator it = functionalRel.begin(); it != functionalRel.end(); ++it)
-            if ((*it) == rel_id)
-                return true;
-        return false;
-    }
-
-    bool hasRange(int rel)
-    {
-        pair<std::multimap<int, int>::iterator, multimap<int, int>::iterator> ret;
-        ret = rel2range.equal_range(rel);
-        return (rel2range.count(rel) > 0);
-    }
-
-    bool hasDomain(int rel)
-    {
-        pair<std::multimap<int, int>::iterator, multimap<int, int>::iterator> ret;
-        ret = rel2range.equal_range(rel);
-        return (rel2domain.count(rel) > 0);
-    }
-
-    pair<int, int> corrupt(int id, int testa, int coda, int relazione) {
-        int testaB, codaB, j = -1; 
-        double pr = 500;
-        if(bern) pr = 1000 * right_num[relazione] / (right_num[relazione] + left_num[relazione]);
-
-        if (rand() % 1000 < pr || isFunctional(relazione)) {
-			if (hasRange(relazione)) {
-				j = getTailCorrupted(relazione, testa);
-			}
-			if (j == -1)
-				j = corrupt_entity(testa, relazione, true);
-
-			testaB = testa;
-			codaB = j;
-		} else {
-			if (hasDomain(relazione))
-				j = getHeadCorrupted(relazione, coda);
-			if (j == -1)
-				j = corrupt_entity(coda, relazione, false);
-
-			testaB = j;
-			codaB = coda;
-		}
-
-        //restituisce un pair con testaB e codaB
-        return make_pair(testaB, codaB);
-    }
-
-    // vero se l'entità index è di classe class_id
-    bool inRange(int id_rel, int id_obj)
-    {
-        // prendi le classi di id_obj!!
-        auto it_range = std::equal_range(instanceOf.begin(), instanceOf.end(), std::make_pair(id_obj, 0));
-        set<int> cls;
-        for (auto it = it_range.first; it != it_range.second; ++it) {
-            cls.insert(it->second);
-        }
-
-        pair<std::multimap<int, int>::iterator, multimap<int, int>::iterator> ret;
-        ret = rel2range.equal_range(id_rel);
-        for (multimap<int, int>::iterator it = ret.first; it != ret.second; ++it)
-            if (cls.find(it->second) != cls.end())
-                return true;
-
-        return false;
-    }
-
-    bool inDomain(int id_rel, int id_sub)
-    {
-        // prendi le classi di id_sub!!
-        auto it_range = std::equal_range(instanceOf.begin(), instanceOf.end(), std::make_pair(id_sub, 0));
-        set<int> cls;
-        for (auto it = it_range.first; it != it_range.second; ++it) {
-            cls.insert(it->second);
-        }
-
-        pair<std::multimap<int, int>::iterator, multimap<int, int>::iterator> ret;
-        ret = rel2domain.equal_range(id_rel);
-        for (multimap<int, int>::iterator it = ret.first; it != ret.second; ++it)
-            if (cls.find(it->second) != cls.end())
-                return true;
-
-        return false;
-    }
-
-    int getHeadCorrupted(int relazione, int coda)
-    {
-        int j = -1;
-        // Formula di Slovin per la dimensione del campione (generati da corrupt_tail)
-        float error = 0.2f; // margine di errore del 20%
-        int tries = entity_num / (1 + entity_num * error * error);
-        for (int i = 0; i < tries; i++)
-        {
-            int corrupt_head = corrupt_entity(coda, relazione, false);
-            if (!inDomain(relazione, corrupt_head))
-            {
-                j = corrupt_head;
-                break;
-            }
-        }
-        return j;
-    }
-
-    int getTailCorrupted(int relazione, int testa)
-    {
-        int j = -1;
-        // Formula di Slovin per la dimensione del campione (generati da corrupt_tail)
-        float error = 0.2f; // margine di errore del 20%
-        int tries = entity_num / (1 + entity_num * error * error);
-        for (int i = 0; i < tries; i++)
-        {
-            int corrupt_tail = corrupt_entity(testa, relazione, true);
-            if (!inRange(relazione, corrupt_tail))
-            {
-                j = corrupt_tail;
-                break;
-            }
-        }
-        return j;
-    }
-    
-    int corrupt_entity(int h, int r, bool head)
-    {
-        Triple *trainTR;
-        int *lefTR, *rigTR;
-
-        if(head)
-        {
-            lefTR = lefHead;
-            rigTR = rigHead;
-            trainTR = trainHead;
-        } else {
-            lefTR = lefTail;
-            rigTR = rigTail;
-            trainTR = trainTail;
-        }
-
-        int lef, rig, mid, ll, rr;
-        lef = lefTR[h] - 1;
-        rig = rigTR[h];
-        while (lef + 1 < rig)
-        {
-            mid = (lef + rig) >> 1;
-            if (trainTR[mid].r >= r)
-                rig = mid;
-            else
-                lef = mid;
-        }
-        ll = rig;
-        lef = lefTR[h];
-        rig = rigTR[h] + 1;
-        while (lef + 1 < rig)
-        {
-            mid = (lef + rig) >> 1;
-            if (trainTR[mid].r <= r)
-                lef = mid;
-            else
-                rig = mid;
-        }
-        rr = lef;
-        int tmp = randMax(entity_num - (rr - ll + 1));
-        if (tmp < trainTR[ll].t)
-            return tmp;
-        if (tmp > trainTR[rr].t - rr + ll - 1)
-            return tmp + rr - ll + 1;
-        lef = ll, rig = rr + 1;
-        while (lef + 1 < rig)
-        {
-            mid = (lef + rig) >> 1;
-            if (trainTR[mid].t - mid + ll - 1 < tmp)
-                lef = mid;
-            else
-                rig = mid;
-        }
-        return tmp + lef - ll + 1;
     }
 
     void trainInstanceOf(int i, int cut){
@@ -880,15 +701,65 @@ private:
 };
 
 Train train;
+
+void OWLinit(map<string,int> rel2id) {
+
+	string tmpStr, tmp;
+
+	// trovo le relazioni inverseOf
+	ifstream inverse_file("../data/" + dataSet + "Train/inverseOf.txt");
+	while (getline(inverse_file, tmp))
+	{
+		string::size_type pos = tmp.find(' ', 0);
+		string first = tmp.substr(0, pos);
+		if (rel2id.find(first) != rel2id.end())
+		{
+			string second = tmp.substr(pos + 1);
+			second = second.substr(0, second.length());
+			if (rel2id.find(second) != rel2id.end())
+			{
+				int id_first = rel2id.find(first)->second;
+				int id_second = rel2id.find(second)->second;
+				inverse.insert(pair<int, int>(id_first, id_second));
+				inverse.insert(pair<int, int>(id_second, id_first));
+			}
+		}
+	}
+	inverse_file.close();
+
+	ifstream eqProp_file("../data/" + dataSet + "Train/equivalentProperty.txt");
+	while (getline(eqProp_file, tmp))
+	{
+		string::size_type pos = tmp.find('\t', 0);
+		string first = tmp.substr(0, pos);
+		if (rel2id.find(first) != rel2id.end())
+		{
+			string second = tmp.substr(pos + 1);
+			second = second.substr(0, second.length());
+			if (rel2id.find(second) != rel2id.end())
+			{
+				int id_first = rel2id.find(first)->second;
+				int id_second = rel2id.find(second)->second;
+				equivalentRel.insert(pair<int, int>(id_first, id_second));
+				equivalentRel.insert(pair<int, int>(id_second, id_first));
+			}
+		}
+	}
+	eqProp_file.close();
+}
+
 void prepare(){
+    if(OWL)
+        note = "_OWL";
+
     map<string,int> rel2id;
     map<string,int> ent2id;
 	map<string, int> class2id;
 
-    FILE* f1 = fopen(("Train/" + dataSet + "entity2id.txt").c_str(),"r");
-    FILE* f2 = fopen(("Train/" + dataSet + "relation2id.txt").c_str(),"r");
-    FILE* f3 = fopen(("Train/" + dataSet + "class2id.txt").c_str(),"r");
-    FILE* f_kb = fopen(("Train/" + dataSet + "triple2id.txt").c_str(),"r");
+    FILE* f1 = fopen(("../data/" + dataSet + "Train/instance2id.txt").c_str(),"r");
+    FILE* f2 = fopen(("../data/" + dataSet + "Train/relation2id.txt").c_str(),"r");
+    FILE* f3 = fopen(("../data/" + dataSet + "Train/class2id.txt").c_str(),"r");
+    FILE* f_kb = fopen(("../data/" + dataSet + "Train/train2id.txt").c_str(),"r");
     fscanf(f1, "%d", &entity_num);
     fscanf(f2, "%d", &relation_num);
     fscanf(f3, "%d", &concept_num);
@@ -989,7 +860,7 @@ void prepare(){
 
     string tmp;
 
-	ifstream class2id_file("Train/" + dataSet + "class2id.txt");
+	ifstream class2id_file("../data/" + dataSet + "Train/class2id.txt");
 	getline(class2id_file, tmp);
 	while (getline(class2id_file, tmp))
 	{
@@ -1001,133 +872,66 @@ void prepare(){
 	class2id_file.close();
 
 	// carico le relazioni per il confronto
-	ifstream rel_file("Train/" + dataSet + "relation2id.txt");
+	ifstream rel_file("../data/" + dataSet + "Train/relation2id.txt");
 	getline(rel_file, tmp);
 	while (getline(rel_file, tmp))
 	{
-		string::size_type pos = tmp.find('\t', 0);
+		string::size_type pos = tmp.find(' ', 0);
 		string rel = tmp.substr(0, pos);
 		int id = atoi(tmp.substr(pos + 1).c_str());
 		rel2id.insert(pair<string, int>(rel, id));
-        if (rel == type_of)
-			typeOf_id = id;
-	}
+        if(rel == typeOf)
+        	typeOf_id = id;
+    }
+    printf("ID TypeOf: %d\n",typeOf_id);
 	rel_file.close();
 
-	// trovo le relazioni inverseOf
-	ifstream inverse_file("Train/" + dataSet + "inverseOf.txt");
-	while (getline(inverse_file, tmp))
-	{
-		string::size_type pos = tmp.find(' ', 0);
-		string first = tmp.substr(0, pos);
-		if (rel2id.find(first) != rel2id.end())
-		{
-			string second = tmp.substr(pos + 1);
-			second = second.substr(0, second.length());
-			if (rel2id.find(second) != rel2id.end())
-			{
-				int id_first = rel2id.find(first)->second;
-				int id_second = rel2id.find(second)->second;
-				inverse.insert(pair<int, int>(id_first, id_second));
-				inverse.insert(pair<int, int>(id_second, id_first));
-			}
-		}
-	}
-	inverse_file.close();
 
 	// carico le entità per il confronto
-	ifstream ent_file("Train/" + dataSet + "entity2id.txt");
+	ifstream ent_file("../data/" + dataSet + "Train/instance2id.txt");
 	getline(ent_file, tmp);
 	while (getline(ent_file, tmp))
 	{
-		string::size_type pos = tmp.find('\t', 0);
+		string::size_type pos = tmp.find(' ', 0);
 		string ent = tmp.substr(0, pos);
 		int id = atoi(tmp.substr(pos + 1).c_str());
 		ent2id.insert(pair<string, int>(ent, id));
 	}
 	ent_file.close();
 
-	ifstream instanceOf_file("Train/" + dataSet + "instanceof.txt");
+	ifstream instanceOf_file("../data/" + dataSet + "Train/instanceOf2id.txt");
 	string tmpStr;
+
+    // salta la prima riga
+    getline(instanceOf_file, tmpStr);
 	while (getline(instanceOf_file, tmpStr))
 	{
 		int pos = tmpStr.find(' ', 0);
-		string a1 = tmpStr.substr(0, pos);
-		string b1 = tmpStr.substr(pos + 1);
-		int a = ent2id.find(a1)->second;
-		int b = class2id.find(b1)->second;
+		int a = atoi(tmpStr.substr(0, pos).c_str());
+		int b = atoi(tmpStr.substr(pos + 1).c_str());
 		train.addInstanceOf(a, b);
 		instance_concept[a].push_back(b);
 		concept_instance[b].push_back(a);
 	}
 	instanceOf_file.close();
 
-	ifstream subclassOf_file("Train/" + dataSet + "subclassof.txt");
+	ifstream subclassOf_file("../data/" + dataSet + "Train/subclassOf2id.txt");
+    // salta la prima riga
+    getline(subclassOf_file, tmpStr);
 	while (getline(subclassOf_file, tmpStr))
 	{
 		int pos = tmpStr.find(' ', 0);
-		string a1 = tmpStr.substr(0, pos);
-		string b1 = tmpStr.substr(pos + 1);
-		int a = class2id.find(a1)->second;
-		int b = class2id.find(b1)->second;
+		int a = atoi(tmpStr.substr(0, pos).c_str());
+		int b = atoi(tmpStr.substr(pos + 1).c_str());
 		train.addSubClassOf(a, b);
 		sub_up_concept[a].push_back(b);
 		up_sub_concept[b].push_back(a);
 	}
 	subclassOf_file.close();
 
-
-	ifstream eqProp_file("Train/" + dataSet + "equivalentProperty.txt");
-	while (getline(eqProp_file, tmp))
-	{
-		string::size_type pos = tmp.find(' ', 0);
-		string first = tmp.substr(0, pos);
-		if (rel2id.find(first) != rel2id.end())
-		{
-			string second = tmp.substr(pos + 1);
-			second = second.substr(0, second.length());
-			if (rel2id.find(second) != rel2id.end())
-			{
-				int id_first = rel2id.find(first)->second;
-				int id_second = rel2id.find(second)->second;
-				equivalentRel.insert(pair<int, int>(id_first, id_second));
-				equivalentRel.insert(pair<int, int>(id_second, id_first));
-			}
-		}
-	}
-	eqProp_file.close();
-
-    ifstream domain_file("Train/" + dataSet + "rs_domain2id.txt");
-	while (getline(domain_file, tmp))
-	{
-		string::size_type pos = tmp.find(' ', 0);
-		int relation = atoi(tmp.substr(0, pos).c_str());
-		int domain = atoi(tmp.substr(pos + 1).c_str());
-		rel2domain.insert(pair<int, int>(relation, domain));
-	}
-	domain_file.close();
-
-	ifstream range_file("Train/" + dataSet + "rs_range2id.txt");
-	while (getline(range_file, tmp))
-	{
-		string::size_type pos = tmp.find(' ', 0);
-		int relation = atoi(tmp.substr(0, pos).c_str());
-		int range = atoi(tmp.substr(pos + 1).c_str());
-		rel2range.insert(pair<int, int>(relation, range));
-	}
-	range_file.close();
-
-	// trovo le relazioni di tipo functional
-	ifstream function_file("Train/" + dataSet + "functionalProperty.txt");
-	while (getline(function_file, tmp))
-	{
-		if (rel2id.find(tmp) != rel2id.end())
-		{
-			functionalRel.push_front(rel2id.find(tmp)->second);
-		}
-	}
-	function_file.close();
-
+    if(OWL) {
+        OWLinit(rel2id);
+    }
 }
 
 int ArgPos(char *str, int argc, char **argv) {
@@ -1169,6 +973,6 @@ int main(int argc, char** argv){
         cout << "bern = " << "False" << endl;
     prepare();
     train.setup(n, rate, margin, margin_ins, margin_sub);
-	if (loadPath != "") train.load();
+	if (loadPath) train.load();
     train.doTrain();
 }
