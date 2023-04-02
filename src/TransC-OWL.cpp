@@ -33,6 +33,9 @@ int typeOf_id;
 
 map<int, int> inverse;
 map<int, int> equivalentRel;
+multimap<int, int> rel2range;	// mappa una relazione nel range, che corrisponde ad una classe
+multimap<int, int> rel2domain;	// mappa una relazione nel domain, che corrisponde ad una classe
+list<int> functionalRel;
 bool L1Flag = true;
 bool bern = false;
 double ins_cut = 8.0;
@@ -89,6 +92,26 @@ int randMax(int x){
     return res;
 }
 
+//vero se la relazione è di tipo functional
+bool isFunctional(int rel_id) {
+	if(functionalRel.size() == 0)
+		return false;
+	for(list<int>::iterator it = functionalRel.begin(); it != functionalRel.end(); ++it)
+		if( (*it) == rel_id)
+			return true;
+	return false;
+}
+
+bool hasRange(int rel) {
+    return !(rel2range.find(rel) == rel2range.end());
+}
+
+bool hasDomain(int rel) {
+    return !(rel2domain.find(rel) == rel2range.end());
+}
+
+
+
 unsigned int relation_num, entity_num, concept_num, triple_num;
 vector<vector<int> > concept_instance;
 vector<vector<int> > instance_concept;
@@ -101,9 +124,6 @@ map<int,double> left_num, right_num;
 int *lefHead, *rigHead;
 int *lefTail, *rigTail;
 double *left_mean, *right_mean;
-multimap<int, int> rel2range;	// mappa una relazione nel range, che corrisponde ad una classe
-multimap<int, int> rel2domain;	// mappa una relazione nel domain, che corrisponde ad una classe
-list<int> functionalRel;
 
 struct Triple
 {
@@ -327,41 +347,222 @@ private:
         // esclude le typeof
         if(fb_r[i] == typeOf_id) return;
 
+        int testa = fb_h[i];
+        int coda = fb_l[i];
+        int relazione = fb_r[i];
         int j; double pr = 500;
-        if(bern) pr = 1000 * right_num[fb_r[i]] / (right_num[fb_r[i]] + left_num[fb_r[i]]);
-        if(rand() % 1000 < pr){
-            do{
-                if(!instance_brother[fb_l[i]].empty()){
-                    if(rand() % 10 < cut){
-                        j = randMax(entity_num);
+        int testaB, codaB;
+
+        if(OWL) {
+            auto pair = corrupt(testa, coda, relazione);
+            testaB = pair.first;
+            codaB = pair.second;
+        } else {
+            if(bern) pr = 1000 * right_num[relazione] / (right_num[relazione] + left_num[relazione]);
+            if(rand() % 1000 < pr){
+                do{
+                    if(!instance_brother[coda].empty()){
+                        if(rand() % 10 < cut){
+                            j = randMax(entity_num);
+                        }else{
+                            j = rand() % (int)instance_brother[coda].size();
+                            j = instance_brother[coda][j];
+                        }
                     }else{
-                        j = rand() % (int)instance_brother[fb_l[i]].size();
-                        j = instance_brother[fb_l[i]][j];
-                    }
-                }else{
-                    j = randMax(entity_num);
-                }
-            }while(ok[make_pair(fb_h[i],fb_r[i])].count(j)>0);
-            doTrainHLR(fb_h[i],fb_l[i],fb_r[i],fb_h[i],j,fb_r[i]);
-        }else{
-            do{
-                if(!instance_brother[fb_h[i]].empty()){
-                    if(rand() % 10 < cut){
                         j = randMax(entity_num);
-                    }else{
-                        j = rand() % (int)instance_brother[fb_h[i]].size();
-                        j = instance_brother[fb_h[i]][j];
                     }
-                }else{
-                    j = randMax(entity_num);
-                }
-            }while (ok[make_pair(j,fb_r[i])].count(fb_l[i])>0);
-            doTrainHLR(fb_h[i],fb_l[i],fb_r[i],j,fb_l[i],fb_r[i]);
+                }while(ok[make_pair(testa,relazione)].count(j)>0);
+
+                testaB = testa;
+                codaB = j;
+            }else{
+                do{
+                    if(!instance_brother[testa].empty()){
+                        if(rand() % 10 < cut){
+                            j = randMax(entity_num);
+                        }else{
+                            j = rand() % (int)instance_brother[testa].size();
+                            j = instance_brother[testa][j];
+                        }
+                    }else{
+                        j = randMax(entity_num);
+                    }
+                }while (ok[make_pair(j,relazione)].count(coda)>0);
+
+                testaB = j;
+                codaB = coda;
+            }
         }
-        norm(relation_tmp[fb_r[i]]);
-        norm(entity_tmp[fb_h[i]]);
-        norm(entity_tmp[fb_l[i]]);
-        norm(entity_tmp[j]);
+
+        doTrainHLR(testa,coda,relazione,testaB,codaB,relazione);
+
+        
+        norm(relation_tmp[relazione]);
+        norm(entity_tmp[testa]);
+        norm(entity_tmp[coda]);
+        norm(entity_tmp[testaB]);
+        norm(entity_tmp[codaB]);
+
+    }
+
+
+    //vero se l'entità index è di classe class_id
+    bool inRange(int id_rel, int id_obj) {
+        //prendi le classi di id_obj!!
+        auto cls = instance_concept[id_obj];
+
+        auto ret = rel2range.equal_range(id_rel);
+        for (multimap<int,int>::iterator it=ret.first; it!=ret.second; ++it)
+            if(find(cls.begin(), cls.end(),it->second)!=cls.end())
+                return true;
+
+        return false;
+    }
+
+    bool inDomain(int id_rel, int id_sub) {
+        //prendi le classi di id_obj!!
+        auto cls = instance_concept[id_sub];
+
+        auto ret = rel2domain.equal_range(id_rel);
+        for (multimap<int,int>::iterator it=ret.first; it!=ret.second; ++it)
+            if(find(cls.begin(), cls.end(),it->second)!=cls.end())
+                return true;
+
+        return false;
+    }
+
+    int corrupt_head(int h, int r) {
+        int lef, rig, mid, ll, rr;
+        lef = lefHead[h] - 1;
+        rig = rigHead[h];
+        while (lef + 1 < rig) {
+            mid = (lef + rig) >> 1;
+            if (trainHead[mid].r >= r) rig = mid; else
+            lef = mid;
+        }
+        ll = rig;
+        lef = lefHead[h];
+        rig = rigHead[h] + 1;
+        while (lef + 1 < rig) {
+            mid = (lef + rig) >> 1;
+            if (trainHead[mid].r <= r) lef = mid; else
+            rig = mid;
+        }
+        rr = lef;
+        int tmp = randMax(entity_num - (rr - ll + 1));
+        if (tmp < trainHead[ll].t) return tmp;
+        if (tmp > trainHead[rr].t - rr + ll - 1) return tmp + rr - ll + 1;
+        lef = ll, rig = rr + 1;
+        while (lef + 1 < rig) {
+            mid = (lef + rig) >> 1;
+            if (trainHead[mid].t - mid + ll - 1 < tmp)
+                lef = mid;
+            else
+                rig = mid;
+        }
+
+        return tmp + lef - ll + 1;
+    }
+
+    int corrupt_tail(int t, int r) {
+        int lef, rig, mid, ll, rr;
+        lef = lefTail[t] - 1;
+        rig = rigTail[t];
+        while (lef + 1 < rig) {
+            mid = (lef + rig) >> 1;
+            if (trainTail[mid].r >= r) rig = mid; else
+            lef = mid;
+        }
+        ll = rig;
+        lef = lefTail[t];
+        rig = rigTail[t] + 1;
+        while (lef + 1 < rig) {
+            mid = (lef + rig) >> 1;
+            if (trainTail[mid].r <= r) lef = mid; else
+            rig = mid;
+        }
+        rr = lef;
+        int tmp = randMax(entity_num - (rr - ll + 1));
+        if (tmp < trainTail[ll].h) return tmp;
+        if (tmp > trainTail[rr].h - rr + ll - 1) return tmp + rr - ll + 1;
+        lef = ll, rig = rr + 1;
+        while (lef + 1 < rig) {
+            mid = (lef + rig) >> 1;
+            if (trainTail[mid].h - mid + ll - 1 < tmp)
+                lef = mid;
+            else
+                rig = mid;
+        }
+
+        return tmp + lef - ll + 1;
+    }
+
+    int getHeadCorrupted(int coda, int relazione) {
+        int j = -1;
+        //Formula di Slovin per la dimensione del campione (generati da corrupt_tail)
+        float error = 0.2f; //margine di errore del 20%
+        int tries = entity_num / (1+ entity_num*error*error);
+        for(int i = 0; i < tries; i++) {
+            int corrpt_head = corrupt_tail(coda, relazione);
+            if(!inDomain(relazione, corrpt_head)){
+                j = corrpt_head;
+                break;
+            }
+        }
+        return j;
+    }
+
+    /*	Ottieni una coda corrotta
+    *	Se la classe della coda non rispetta il range
+    *		sceglila per l'addestramento
+    *	altrimenti scegli un'altra coda
+    *	ripeti per n tentativi, prima di rinunciare e andare col metodo standard
+    */
+    int getTailCorrupted(int testa, int relazione) {
+        int j = -1;
+        //Formula di Slovin per la dimensione del campione (generati da corrupt_tail)
+        float error = 0.2f; //margine di errore del 20%
+        int tries = entity_num / (1+ entity_num*error*error);
+        for(int i = 0; i < tries; i++) {
+            int corrpt_tail = corrupt_head(testa, relazione);
+            if(!inRange(relazione, corrpt_tail)){
+                j = corrpt_tail;
+                break;
+            }
+        }
+        return j;
+    }
+
+
+    pair<int, int> corrupt(int testa, int coda, int relazione) {
+        int j = -1; double pr = 500;
+        int testaB, codaB;
+
+        if (bern)
+            pr = 1000 * right_mean[relazione] / (right_mean[relazione] + left_mean[relazione]);
+        else
+            pr = 500;
+
+        if (rand() % 1000 < pr || isFunctional(relazione)) {
+            if(hasRange(relazione)) {
+                j = getTailCorrupted(testa, relazione);
+            }
+            if(j == -1)
+                j = corrupt_head(testa, relazione);
+
+            testaB = testa;
+            codaB = j;
+        } else {
+            if(hasDomain(relazione))
+                j = getHeadCorrupted(coda, relazione);
+            if(j == -1)
+                j = corrupt_tail(coda, relazione);
+
+            testaB = j;
+            codaB = coda;
+        }
+
+        return make_pair(testaB, codaB);
     }
 
     void trainInstanceOf(int i, int cut){
@@ -472,13 +673,19 @@ private:
         {
             res+=margin+sum1-sum2;
 
-            if (getInverse(rel_a) != -1)
-            {
-                gradientInverseOf(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b, getInverse(rel_a));
-            }
-            else if (getEquivalentProperty(rel_a) != -1)
-            {
-                gradientEquivalentProperty(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b, getEquivalentProperty(rel_a));
+            if(OWL) {
+                if (getInverse(rel_a) != -1)
+                {
+                    gradientInverseOf(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b, getInverse(rel_a));
+                }
+                else if (getEquivalentProperty(rel_a) != -1)
+                {
+                    gradientEquivalentProperty(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b, getEquivalentProperty(rel_a));
+                }
+                else
+                {
+                    gradientHLR(e1_a, e2_a, rel_a, e1_b, e2_b, rel_b);
+                }
             }
             else
             {
@@ -540,48 +747,6 @@ private:
         return dis - sqr(concept_r[c2]) + sqr(concept_r[c1]);
 
     }
-    void gradientInverseOf(int e1_a, int e2_a, int rel_a, int e1_b, int e2_b, int rel_b, int inverseRel)
-    {
-        int lasta1 = e1_a * n;
-        int lasta2 = e2_a * n;
-        int lastar = rel_a * n;
-        int lastb1 = e1_b * n;
-        int lastb2 = e2_b * n;
-        int lastbr = rel_b * n;
-        int lastInverse = inverseRel * n;
-        // se entità equivalenti, salva array
-        for (int ii = 0; ii < n; ii++)
-        {
-            double x;
-            x = (entity_tmp[e2_a][ii] - entity_tmp[e1_a][ii] - relation_vec[rel_a][ii]);
-            if (x > 0)
-                x = -1;
-            else
-                x = 1;
-
-            relation_vec[rel_a][ii] -= x;
-            entity_tmp[e1_a][ii] -= x;
-            entity_tmp[e2_a][ii] += x;
-
-            relation_vec[inverseRel][ii] -= x;
-            entity_tmp[e2_a][ii] -= x;
-            entity_tmp[e1_a][ii] += x;
-
-            x = (entity_tmp[e2_b][ii] - entity_tmp[e1_b][ii] - relation_vec[rel_b][ii]);
-            if (x > 0)
-                x = 1;
-            else
-                x = -1;
-            relation_vec[rel_b][ii] -= x;
-            entity_tmp[e1_b][ii] -= x;
-            entity_tmp[e2_b][ii] += x;
-
-            relation_vec[inverseRel][ii] -= x;
-            entity_tmp[e2_b][ii] -= x;
-            entity_tmp[e1_b][ii] += x;
-        }
-    }
-
 
     void gradientEquivalentProperty(int e1_a, int e2_a, int rel_a, int e1_b, int e2_b, int rel_b, int equivalent)
     {
@@ -608,6 +773,52 @@ private:
             entity_tmp[e1_b][ii] -= x;
             entity_tmp[e2_b][ii] += x;
         }
+    }
+
+    void gradientInverseOf(int e1_a, int e2_a, int rel_a, int e1_b, int e2_b, int rel_b, int inverseRel)
+    {
+        for (int ii=0; ii<n; ii++)
+        {
+
+            double x = 2*(entity_vec[e2_a][ii]-entity_vec[e1_a][ii]-relation_vec[rel_a][ii]);
+            if (L1Flag){
+                if (x>0){
+                    x=1;
+                }
+                else{
+                    x=-1;
+                }
+            }
+
+            relation_tmp[rel_a][ii]-=-1*rate*x;
+            entity_tmp[e1_a][ii]-=-1*rate*x;
+            entity_tmp[e2_a][ii]+=-1*rate*x;
+
+            relation_tmp[inverseRel][ii]-=-1*rate*x;
+            entity_tmp[e2_a][ii]-=-1*rate*x;
+            entity_tmp[e1_a][ii]+=-1*rate*x;
+
+            // Tripla corrotta
+            x = 2*(entity_vec[e2_b][ii]-entity_vec[e1_b][ii]-relation_vec[rel_b][ii]);
+            if (L1Flag){
+                if (x>0){
+                    x=1;
+                }
+                else{
+                    x=-1;
+                }
+            }
+            relation_tmp[rel_b][ii]-=rate*x;
+            entity_tmp[e1_b][ii]-=rate*x;
+            entity_tmp[e2_b][ii]+=rate*x;
+
+            relation_tmp[inverseRel][ii]-=rate*x;
+            entity_tmp[e2_b][ii]-=rate*x;
+            entity_tmp[e1_b][ii]+=rate*x;
+
+        }
+
+        norm(relation_tmp[inverseRel]);
     }
 
     void gradientHLR(int e1_a, int e2_a, int rel_a, int e1_b, int e2_b, int rel_b){
@@ -699,8 +910,8 @@ private:
         }
     }
 };
-
 Train train;
+
 
 void OWLinit(map<string,int> rel2id) {
 
@@ -710,7 +921,7 @@ void OWLinit(map<string,int> rel2id) {
 	ifstream inverse_file("../data/" + dataSet + "Train/inverseOf.txt");
 	while (getline(inverse_file, tmp))
 	{
-		string::size_type pos = tmp.find(' ', 0);
+		string::size_type pos = tmp.find('\t', 0);
 		string first = tmp.substr(0, pos);
 		if (rel2id.find(first) != rel2id.end())
 		{
@@ -730,7 +941,7 @@ void OWLinit(map<string,int> rel2id) {
 	ifstream eqProp_file("../data/" + dataSet + "Train/equivalentProperty.txt");
 	while (getline(eqProp_file, tmp))
 	{
-		string::size_type pos = tmp.find('\t', 0);
+		string::size_type pos = tmp.find(' ', 0);
 		string first = tmp.substr(0, pos);
 		if (rel2id.find(first) != rel2id.end())
 		{
@@ -746,6 +957,35 @@ void OWLinit(map<string,int> rel2id) {
 		}
 	}
 	eqProp_file.close();
+
+    ifstream domain_file("../data/" + dataSet + "Train/rs_domain2id.txt");
+    getline(domain_file, tmp);
+    while (getline(domain_file, tmp)) {
+        string::size_type pos=tmp.find(' ',0);
+    	int relation= atoi(tmp.substr(0,pos).c_str());
+    	int domain = atoi(tmp.substr(pos+1).c_str());
+    	rel2domain.insert(pair<int,int>(relation,domain));
+    }
+    domain_file.close();
+
+    ifstream range_file("../data/" + dataSet + "Train/rs_range2id.txt");
+    getline(domain_file, tmp);
+    while (getline(range_file, tmp)) {
+        string::size_type pos=tmp.find(' ',0);
+    	int relation= atoi(tmp.substr(0,pos).c_str());
+    	int range = atoi(tmp.substr(pos+1).c_str());
+    	rel2range.insert(pair<int,int>(relation,range));
+    }
+    range_file.close();
+
+    //trovo le relazioni di tipo functional
+    ifstream function_file("../data/" + dataSet + "Train/functionalProperty.txt");
+    while (getline(function_file, tmp)) {
+        if (rel2id.find(tmp) != rel2id.end()){
+            functionalRel.push_front(rel2id.find(tmp)->second);
+        }
+    }
+    function_file.close();
 }
 
 void prepare(){
@@ -958,6 +1198,7 @@ int main(int argc, char** argv){
     if ((i = ArgPos((char *)"-l1flag", argc, argv)) > 0) L1Flag = static_cast<bool>(atoi(argv[i + 1]));
     if ((i = ArgPos((char *)"-bern", argc, argv)) > 0) bern = static_cast<bool>(atoi(argv[i + 1]));
     bern = true;
+    L1Flag = false;
     cout << "vector dimension = " << n << endl;
     cout << "learing rate = " << rate << endl;
     cout << "margin = " << margin << endl;

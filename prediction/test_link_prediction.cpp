@@ -18,7 +18,7 @@ long dimension = 100;
 long testTotal, tripleTotal, trainTotal, validTotal;
 long testTotalR[1500];
 float *entityVec, *relationVec, *entityRelVec, *matrix;
-string dataSet = "YAGO39K";
+string dataSet = "DBpedia15K";
 
 struct Triple {
     long h, r, t;
@@ -41,25 +41,32 @@ bool cmp(Mix a, Mix b){
 
 Triple *testList, *tripleList;
 
+bool OWL = false;
+string note = "";
+
 void init() {
     FILE *fin;
     long tmp, h, r, t;
 
-    fin = fopen(("../src/data/" + dataSet + "/Train/relation2id.txt").c_str(), "r");
+    if(OWL) {
+        note = "_OWL";
+    }
+
+    fin = fopen(("../data/" + dataSet + "/Train/relation2id.txt").c_str(), "r");
     tmp = fscanf(fin, "%ld", &relationTotal);
     fclose(fin);
     relationVec = (float *)calloc(relationTotal * dimension, sizeof(float));
     
-    fin = fopen(("../src/data/" + dataSet + "/Train/instance2id.txt").c_str(), "r");
+    fin = fopen(("../data/" + dataSet + "/Train/instance2id.txt").c_str(), "r");
     tmp = fscanf(fin, "%ld", &entityTotal);
     fclose(fin);
     entityVec = (float *)calloc(entityTotal * dimension, sizeof(float));
     matrix = (float *)calloc(relationTotal * dimension * dimension, sizeof(float));
 
 
-    FILE* f_kb1 = fopen(("../src/data/" + dataSet + "/Test/triple2id_positive.txt").c_str(),"r");
-    FILE* f_kb2 = fopen(("../src/data/" + dataSet + "/Train/triple2id.txt").c_str(),"r");
-    FILE* f_kb3 = fopen(("../src/data/" + dataSet + "/Valid/triple2id_positive.txt").c_str(),"r");
+    FILE* f_kb1 = fopen(("../data/" + dataSet + "/Test/test2id.txt").c_str(),"r");
+    FILE* f_kb2 = fopen(("../data/" + dataSet + "/Train/train2id.txt").c_str(),"r");
+    FILE* f_kb3 = fopen(("../data/" + dataSet + "/Valid/valid2id.txt").c_str(),"r");
     tmp = fscanf(f_kb1, "%ld", &testTotal);
     tmp = fscanf(f_kb2, "%ld", &trainTotal);
     tmp = fscanf(f_kb3, "%ld", &validTotal);
@@ -126,14 +133,14 @@ void* prepareMode(void *con) {
 void prepare() {
     FILE *fin;
     long tmp;
-    fin = fopen("../src/Output/entity2vec_OWL.vec", "r");
+    fin = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + ".vec").c_str(), "r");
     for (long i = 0; i < entityTotal; i++) {
         long last = i * dimension;
         for (long j = 0; j < dimension; j++)
             tmp = fscanf(fin, "%f", &entityVec[last + j]);
     }
     fclose(fin);
-    fin = fopen("../src/Output/relation2vec_OWL.vec", "r");
+    fin = fopen(("../data/" + dataSet + "/Output/relation2vec" + note + ".vec").c_str(), "r");
     for (long i = 0; i < relationTotal; i++) {
         long last = i * dimension;
         for (long j = 0; j < dimension; j++)
