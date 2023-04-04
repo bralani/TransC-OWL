@@ -1,4 +1,4 @@
-279
+280
 <http://dbpedia.org/ontology/academicAdvisor> 0
 <http://dbpedia.org/ontology/affiliation> 1
 <http://dbpedia.org/ontology/aircraftTransport> 2

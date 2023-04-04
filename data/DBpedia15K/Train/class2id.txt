@@ -1,4 +1,4 @@
-1179
+1180
 <http://dbpedia.org/datatype/cubicCentimetre> 1
 <http://dbpedia.org/datatype/cubicKilometre> 2
 <http://dbpedia.org/datatype/cubicMetre> 3
@@ -1177,4 +1177,4 @@ owl:Thing 858
 <http://xmlns.com/foaf/0.1/Document> 1176
 <http://xmlns.com/foaf/0.1/Image> 1177
 <http://xmlns.com/foaf/0.1/Person> 1178
-<http://dbpedia.org/ontology/Member_of_Congress> 1178
+<http://dbpedia.org/ontology/Member_of_Congress> 1179
