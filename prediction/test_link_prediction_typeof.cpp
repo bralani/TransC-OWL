@@ -13,12 +13,14 @@ using namespace std;
 
 long relationTotal;
 long entityTotal;
+long conceptTotal;
 long threads = 8;
 long dimension = 100;
 long testTotal, tripleTotal, trainTotal, validTotal;
-long testTotalR[1500];
-float *entityVec, *relationVec, *entityRelVec, *matrix;
-string dataSet = "Nell";
+float *entityVec, *relationVec, *matrix;
+vector<vector<double> > concept_vec;
+vector<double> concept_r;
+string dataSet = "DBpedia15K";
 
 struct Triple {
     long h, r, t;
@@ -41,7 +43,7 @@ bool cmp(Mix a, Mix b){
 
 Triple *testList, *tripleList;
 
-bool OWL = true;
+bool OWL = false;
 string note = "";
 
 void init() {
@@ -60,13 +62,18 @@ void init() {
     fin = fopen(("../data/" + dataSet + "/Train/instance2id.txt").c_str(), "r");
     tmp = fscanf(fin, "%ld", &entityTotal);
     fclose(fin);
+
+    fin = fopen(("../data/" + dataSet + "/Train/class2id.txt").c_str(), "r");
+    tmp = fscanf(fin, "%ld", &conceptTotal);
+    fclose(fin);
+
     entityVec = (float *)calloc(entityTotal * dimension, sizeof(float));
     matrix = (float *)calloc(relationTotal * dimension * dimension, sizeof(float));
 
 
-    FILE* f_kb1 = fopen(("../data/" + dataSet + "/Test/test2id.txt").c_str(),"r");
-    FILE* f_kb2 = fopen(("../data/" + dataSet + "/Train/train2id.txt").c_str(),"r");
-    FILE* f_kb3 = fopen(("../data/" + dataSet + "/Valid/valid2id.txt").c_str(),"r");
+    FILE* f_kb1 = fopen(("../data/" + dataSet + "/Test/instanceOf2id.txt").c_str(),"r");
+    FILE* f_kb2 = fopen(("../data/" + dataSet + "/Train/instanceOf2id.txt").c_str(),"r");
+    FILE* f_kb3 = fopen(("../data/" + dataSet + "/Valid/instanceOf2id.txt").c_str(),"r");
     tmp = fscanf(f_kb1, "%ld", &testTotal);
     tmp = fscanf(f_kb2, "%ld", &trainTotal);
     tmp = fscanf(f_kb3, "%ld", &validTotal);
@@ -77,32 +84,24 @@ void init() {
     for (long i = 0; i < testTotal; i++) {
         tmp = fscanf(f_kb1, "%ld", &h);
         tmp = fscanf(f_kb1, "%ld", &t);
-        tmp = fscanf(f_kb1, "%ld", &r);
         testList[i].h = h;
         testList[i].t = t;
-        testList[i].r = r;
         tripleList[i].h = h;
         tripleList[i].t = t;
-        tripleList[i].r = r;
-        testTotalR[r] += 1;
     }
 
     for (long i = 0; i < trainTotal; i++) {
         tmp = fscanf(f_kb2, "%ld", &h);
         tmp = fscanf(f_kb2, "%ld", &t);
-        tmp = fscanf(f_kb2, "%ld", &r);
         tripleList[i + testTotal].h = h;
         tripleList[i + testTotal].t = t;
-        tripleList[i + testTotal].r = r;
     }
 
     for (long i = 0; i < validTotal; i++) {
         tmp = fscanf(f_kb3, "%ld", &h);
         tmp = fscanf(f_kb3, "%ld", &t);
-        tmp = fscanf(f_kb3, "%ld", &r);
         tripleList[i + testTotal + trainTotal].h = h;
         tripleList[i + testTotal + trainTotal].t = t;
-        tripleList[i + testTotal + trainTotal].r = r;
     }
     
     fclose(f_kb1);
@@ -110,24 +109,6 @@ void init() {
     fclose(f_kb3);
 
     sort(tripleList, tripleList + tripleTotal, cmpHead());
-}
-
-
-void* prepareMode(void *con) {
-    long id;
-    id = (unsigned long long)(con);
-    long lef = entityTotal / (threads) * id;
-    long rig = entityTotal / (threads) * (id + 1);
-    if (id == threads - 1) rig = entityTotal;
-    for (long i = lef; i < rig; i++) {
-        if (i % 100 == 0) printf("%ld\n", i);
-        for (long j = 0; j < relationTotal; j++) {
-            long last = i * dimension * relationTotal + j * dimension;
-            for (long k = 0; k < dimension; k++)
-                for (long kk = 0; kk < dimension; kk++)
-                    entityRelVec[last + k] += matrix[j * dimension * dimension + k * dimension + kk] * entityVec[i * dimension + kk];
-        }
-    }
 }
 
 void prepare() {
@@ -147,35 +128,46 @@ void prepare() {
             tmp = fscanf(fin, "%f", &relationVec[last + j]);
     }
     fclose(fin);
-    entityRelVec = (float *)calloc(entityTotal * relationTotal * dimension,sizeof(float));
-    for (long i = 0; i < entityTotal; i++)
-        for (long j = 0; j < relationTotal; j++) {
-            long last = i * dimension * relationTotal + j * dimension;
-            for (long k = 0; k < dimension; k++)
-                entityRelVec[last + k] = entityVec[i * dimension + k];
+
+    concept_vec.resize(conceptTotal);
+    concept_r.resize(conceptTotal);
+    fin = fopen(("../data/" + dataSet + "/Output/concept2vec" + note + ".vec").c_str(), "r");
+    for (long i = 0; i < conceptTotal; i++) {
+        concept_vec[i].resize(dimension);
+        for(int j = 0; j < dimension; ++j){
+            fscanf(fin, "%lf", &concept_vec[i][j]);
         }
+        fscanf(fin, "%lf", &concept_r[i]);
+    }
+    fclose(fin);
 }
 
-float calcSum(long e1, long e2, long rel) {
-    float res = 0;
-    long last1 = e1 * relationTotal * dimension + rel * dimension;
-    long last2 = e2 * relationTotal * dimension + rel * dimension;
-    long lastr = rel * dimension;
-    for (long i = 0; i < dimension; i++)
-        res += fabs(entityRelVec[last1 + i] + relationVec[lastr + i] - entityRelVec[last2 + i]);
-    return res;
+double sqr(double x){
+    return x * x;
+}
+double calcSum(int e, int c){
+    double dis = 0;
+    for (long i = 0; i < dimension; i++) {
+        double first = entityVec[e * dimension + i];
+        double second = concept_vec[c][i];
+        dis += sqr(first - second);
+    }
+    if(dis < sqr(concept_r[c])){
+        return 0;
+    }
+    return dis - sqr(concept_r[c]);
 }
 
-bool find(long h, long t, long r) {
+bool find(long h, long t) {
     long lef = 0;
     long rig = tripleTotal - 1;
     long mid;
     while (lef + 1 < rig) {
         long mid = (lef + rig) >> 1;
-        if ((tripleList[mid]. h < h) || (tripleList[mid]. h == h && tripleList[mid]. r < r) || (tripleList[mid]. h == h && tripleList[mid]. r == r && tripleList[mid]. t < t)) lef = mid; else rig = mid;
+        if ((tripleList[mid]. h < h) || (tripleList[mid]. h == h ) || (tripleList[mid]. h == h && tripleList[mid]. t < t)) lef = mid; else rig = mid;
     }
-    if (tripleList[lef].h == h && tripleList[lef].r == r && tripleList[lef].t == t) return true;
-    if (tripleList[rig].h == h && tripleList[rig].r == r && tripleList[rig].t == t) return true;
+    if (tripleList[lef].h == h && tripleList[lef].t == t) return true;
+    if (tripleList[rig].h == h && tripleList[rig].t == t) return true;
     return false;
 }
 
@@ -194,33 +186,34 @@ void* testMode(void *con) {
     for (long i = lef; i <= rig; i++) {
         long h = testList[i].h;
         long t = testList[i].t;
-        long r = testList[i].r;
-        float minimal = calcSum(h, t, r);
+        float minimal = calcSum(h, t);
         long l_filter_s = 0;
         long l_s = 0;
         long r_filter_s = 0;
         long r_s = 0;
         for (long j = 0; j < entityTotal; j++) {
             if (j != h) {
-                float value = calcSum(j, t, r);
+                float value = calcSum(j, t);
                 if (value < minimal) {
                     l_s += 1;
-                    if (not find(j, t, r))
+                    if (not find(j, t))
                         l_filter_s += 1;
                 }
             }
+        }
+        for (long j = 0; j < conceptTotal; j++) {
             if (j != t) {
-                float value = calcSum(h, j, r);
+                float value = calcSum(h, j);
                 if (value < minimal) {
                     r_s += 1;
-                    if (not find(h, j, r))
+                    if (not find(h, j))
                         r_filter_s += 1;
                 }
             }
         }
+
         if (l_filter_s < 10){
             l_filter_tot[id] += 1;
-            lft[id][r] += 1;
         }
         if (l_filter_s < 1) l_filter_tot1[id] += 1;
         if (l_filter_s < 3) l_filter_tot3[id] += 1;
@@ -233,7 +226,6 @@ void* testMode(void *con) {
 
         if (r_filter_s < 10){
             r_filter_tot[id] += 1;
-            rft[id][r] += 1;
         }
         if (r_filter_s < 1) r_filter_tot1[id] += 1;
         if (r_filter_s < 3) r_filter_tot3[id] += 1;
@@ -301,10 +293,6 @@ void* test(void *con) {
         l_filter_tot5[a] += l_filter_tot5[a - 1];
         r_filter_tot5[a] += r_filter_tot5[a - 1];
 
-        for (long j = 0; j < relationTotal; ++j){
-            lft[a][j] += lft[a - 1][j];
-            rft[a][j] += rft[a - 1][j];
-        }
         l_tot[a] += l_tot[a - 1];
         r_tot[a] += r_tot[a - 1];
         l_tot1[a] += l_tot1[a - 1];

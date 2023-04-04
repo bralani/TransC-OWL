@@ -16,6 +16,7 @@ int dim = 100, sub_test_num = 0, ins_test_num = 0, concept_num = 0, entity_num =
 double delta_ins = 0, delta_sub = 0;
 bool valid = true;
 bool mix = false;
+bool OWL = false;
 string dataSet = "DBpedia15K";
 
 vector<vector<double> > entity_vec, concept_vec;
@@ -60,7 +61,6 @@ void init(){
     ins_right.clear(); ins_wrong.clear(); sub_right.clear(); sub_wrong.clear();
 }
 
-bool OWL = true;
 string note = "";
 
 void prepare(){
@@ -161,16 +161,7 @@ pair<double, double> test(){
         concept_set.insert(concept_s);
         concept_set.insert(concept_m);
     }
-    for(int i = 0; i < sub_test_num; ++i){
-        if(checkSubClass(sub_right[i].first, sub_right[i].second))
-            TP_sub++;
-        else
-            FN_sub++;
-        if(!checkSubClass(sub_wrong[i].first, sub_wrong[i].second))
-            TN_sub++;
-        else
-            FP_sub++;
-    }
+    
     if(valid){
         double ins_ans = (TP_ins + TN_ins) * 100 / (TP_ins + TN_ins + FN_ins + FP_ins);
         double sub_ins = (TP_sub + TN_sub) * 100 / (TP_sub + TN_sub + FN_sub + FP_sub);
@@ -208,21 +199,15 @@ void runValid(){
     for(int i = 0; i < 101; ++i){
         double f = i; f /= 100;
         delta_ins = f;
-        delta_sub = f * 2;
         pair<double, double> ans = test();
         if(ans.first > ins_best_answer){
             ins_best_answer = ans.first;
             ins_best_delta = f;
         }
-        if(ans.second > sub_best_answer){
-            sub_best_answer = ans.second;
-            sub_best_delta = f * 2;
-        }
     }
     cout << "delta_ins is " << ins_best_delta << ". The best ins accuracy on valid data is " << ins_best_answer << "%" << endl;
     cout << endl;
     delta_ins = ins_best_delta;
-    delta_sub = sub_best_delta;
     valid = false;
     prepare();
     test();

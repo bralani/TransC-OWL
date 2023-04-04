@@ -11,6 +11,7 @@ using namespace std;
 
 int dim = 100;
 int test_num = 0, relation_num = 0, valid_num = 0, entity_num = 0;
+bool OWL = false;
 string dataSet = "DBpedia15K";
 bool valid = true;
 bool getMinMax = false;
@@ -48,7 +49,6 @@ void init(){
     delta_relation.clear(); entity_vec.clear(); right_triple.clear(); wrong_triple.clear(); max_min_relation.clear();
 }
 
-bool OWL = false;
 string note = "";
 
 void prepare(bool final_test = false){
