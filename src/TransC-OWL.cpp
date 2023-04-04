@@ -24,7 +24,7 @@ using namespace std;
 
 #define pi 3.1415926535897932384626433832795
 
-bool OWL = false;                 // indica se far partire l'algoritmo transC-OWL o transC
+bool OWL = true;                 // indica se far partire l'algoritmo transC-OWL o transC
 bool loadPath = false;            // indica se caricare i vettori già addestrati
 
 string note = "";
@@ -33,8 +33,10 @@ int typeOf_id;
 
 map<int, int> inverse;
 map<int, int> equivalentRel;
+map<int, int> equivalentClass;
 multimap<int, int> rel2range;	// mappa una relazione nel range, che corrisponde ad una classe
 multimap<int, int> rel2domain;	// mappa una relazione nel domain, che corrisponde ad una classe
+multimap<int,int> cls2false_t;	//data una entità, restituisce una classe falsa (per tail corruption)
 list<int> functionalRel;
 bool L1Flag = true;
 bool bern = false;
@@ -645,6 +647,31 @@ private:
         normR(concept_r_tmp[j]);
     }
 
+
+    set<int> getEquivalentClass(int id_class) {
+        set<int> cls;
+        pair <std::multimap<int,int>::iterator, multimap<int,int>::iterator> ret;
+        ret = equivalentClass.equal_range(id_class);
+        for (multimap<int,int>::iterator it=ret.first; it!=ret.second; ++it)
+            cls.insert(it->second);
+        return cls;
+    }
+
+    int getFalseClass(int classe) {
+        int j = -1;
+        pair <std::multimap<int,int>::iterator, multimap<int,int>::iterator> ret;
+        ret = cls2false_t.equal_range(classe);
+        vector<int> cls_vec;
+        for (multimap<int,int>::iterator it=ret.first; it!=ret.second; ++it) {
+            cls_vec.push_back(it->second);
+        }
+        if(cls_vec.size() > 0) {
+            int RandIndex = rand() % cls_vec.size();
+            j = cls_vec[RandIndex];
+        }
+        return j;
+}
+
     int getInverse(int rel)
     {
         if (inverse.size() == 0)
@@ -852,11 +879,50 @@ private:
         }
     }
 
-    void gradientInstanceOf(int e_a, int c_a, int e_b, int c_b){
-        double dis = 0;
-        for(int i = 0; i < n; ++i){
-            dis += sqr(entity_vec[e_a][i] - concept_vec[c_a][i]);
+    void gradientInstanceOf(int e_a, int c_a, int e_b, int c_b) {
+
+        bool corrupt = false;
+        vector<int> corr;
+        set<int> eq_cls = getEquivalentClass(c_a);
+
+        if(OWL) {
+            corrupt = true;
+            for(set<int>::iterator it = eq_cls.begin(); it != eq_cls.end(); ++it) {
+                int false_cl = getFalseClass(e_a);
+                if(false_cl != -1)
+                    corr.push_back(false_cl);
+                else {
+                    corrupt = false;
+                    break;
+                }
+            }
         }
+
+        double pos_x = gradientPositiveInstanceOf(e_a, c_a, false, 0);
+        double neg_x = gradientNegativeInstanceOf(e_b, c_b, false, 0);
+
+        if(OWL && corrupt && eq_cls.size() > 0) {
+			int i = 0;
+			for(set<int>::iterator it = eq_cls.begin(); it != eq_cls.end(); ++it) {
+				int e_Cls = (*it);
+                gradientPositiveInstanceOf(e_a, e_Cls, true, pos_x);
+
+                int tail = corr[i];
+                gradientNegativeInstanceOf(e_b, tail, true, neg_x);
+				i++;
+			}
+		}
+    }
+
+    double gradientPositiveInstanceOf(int e_a, int c_a, bool gradient, double dis) {
+        if(gradient == false) {
+            dis = 0;
+
+            for(int i = 0; i < n; ++i){
+                dis += sqr(entity_vec[e_a][i] - concept_vec[c_a][i]);
+            }
+        }
+
         if(dis > sqr(concept_r[c_a])){
             for(int j = 0; j < n; ++j){
                 double x = 2 * (entity_vec[e_a][j] - concept_vec[c_a][j]);
@@ -866,18 +932,28 @@ private:
             concept_r_tmp[c_a] -= -2 * concept_r[c_a] * rate;
         }
 
-        dis = 0;
-        for(int i = 0; i < n; ++i){
-            dis += sqr(entity_vec[e_b][i] - concept_vec[c_b][i]);
-        }
-        if(dis > sqr(concept_r[c_b])){
-            for(int j = 0; j < n; ++j){
-                double x = 2 * (entity_vec[e_b][j] - concept_vec[c_b][j]);
-                entity_tmp[e_b][j] += x * rate;
-                concept_tmp[c_b][j] += -1 * x * rate;
+        return dis;
+    }
+    
+    double gradientNegativeInstanceOf(int e_a, int c_a, bool gradient, double dis) {
+        if(gradient == false) {
+            dis = 0;
+
+            for(int i = 0; i < n; ++i){
+                dis += sqr(entity_vec[e_a][i] - concept_vec[c_a][i]);
             }
-            concept_r_tmp[c_b] += -2 * concept_r[c_b] * rate;
         }
+
+        if(dis > sqr(concept_r[c_a])){
+            for(int j = 0; j < n; ++j){
+                double x = 2 * (entity_vec[e_a][j] - concept_vec[c_a][j]);
+                entity_tmp[e_a][j] += x * rate;
+                concept_tmp[c_a][j] += -1 * x * rate;
+            }
+            concept_r_tmp[c_a] += -2 * concept_r[c_a] * rate;
+        }
+
+        return dis;
     }
 
     void gradientSubClassOf(int c1_a, int c2_a, int c1_b, int c2_b){
@@ -913,7 +989,7 @@ private:
 Train train;
 
 
-void OWLinit(map<string,int> rel2id) {
+void OWLinit(map<string,int> rel2id, map<string,int> class2id) {
 
 	string tmpStr, tmp;
 
@@ -957,6 +1033,36 @@ void OWLinit(map<string,int> rel2id) {
 		}
 	}
 	eqProp_file.close();
+
+    ifstream eqClass_file("../data/" + dataSet + "Train/equivalentClass.txt");
+    while (getline(eqClass_file, tmp)) {
+    	string::size_type pos=tmp.find('\t',0);
+		string first = tmp.substr(0,pos);
+		if(class2id.find(first) != class2id.end()) {
+			string second= tmp.substr(pos+1);
+			second = second.substr(0, second.length());
+			if(class2id.find(second) != class2id.end()) {
+				int id_first = class2id.find(first)->second;
+				int id_second = class2id.find(second)->second;
+				equivalentClass.insert(pair<int,int>(id_first, id_second));
+				equivalentClass.insert(pair<int,int>(id_second,id_first));
+			}
+		}
+    }
+    eqClass_file.close();
+
+
+    ifstream false_file("../data/" + dataSet + "Train/falseinstanceOf2id.txt");
+    getline(false_file, tmp);
+	while (getline(false_file, tmp)) {
+		string::size_type pos = tmp.find(' ',0);
+		string last_part= tmp.substr(pos+1);
+		int head = atoi(tmp.substr(0,pos).c_str());
+		pos=last_part.find(' ',0);
+		int cls = atoi(last_part.substr(0,pos).c_str());
+		cls2false_t.insert(pair<int,int>(head,cls));
+		//cls2false_h.insert(pair<int,int>(cls,head));
+	}
 
     ifstream domain_file("../data/" + dataSet + "Train/rs_domain2id.txt");
     getline(domain_file, tmp);
@@ -1170,7 +1276,7 @@ void prepare(){
 	subclassOf_file.close();
 
     if(OWL) {
-        OWLinit(rel2id);
+        OWLinit(rel2id, class2id);
     }
 }
 
