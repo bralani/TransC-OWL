@@ -1304,6 +1304,7 @@ int main(int argc, char** argv){
     if ((i = ArgPos((char *)"-data", argc, argv)) > 0) dataSet = argv[i + 1];
     if ((i = ArgPos((char *)"-l1flag", argc, argv)) > 0) L1Flag = static_cast<bool>(atoi(argv[i + 1]));
     if ((i = ArgPos((char *)"-bern", argc, argv)) > 0) bern = static_cast<bool>(atoi(argv[i + 1]));
+    if ((i = ArgPos((char *)"-OWL", argc, argv)) > 0) OWL = static_cast<bool>(atoi(argv[i + 1]));
     bern = true;
     L1Flag = false;
     cout << "vector dimension = " << n << endl;
