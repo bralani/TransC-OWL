@@ -42,7 +42,7 @@ bool L1Flag = true;
 bool bern = false;
 double ins_cut = 8.0;
 double sub_cut = 8.0;
-string dataSet = "DBpedia15K/";
+string dataSet = "DBpedia100K/";
 
 double rand(double min, double max){
     return min + (max - min) * rand() / (RAND_MAX + 1.0);
@@ -305,9 +305,9 @@ public:
                 cout<<"epoch:"<<epoch<<' '<<res<<endl;
             }
             if(epoch % 100 == 0 || epoch == nepoch - 1){
-                FILE* f2 = fopen(("../data/" + dataSet + "Output/relation2vec" + note + ".vec").c_str(), "w");
-                FILE* f3 = fopen(("../data/" + dataSet + "Output/entity2vec" + note + ".vec").c_str(), "w");
-                FILE* f4 = fopen(("../data/" + dataSet + "Output/concept2vec" + note + ".vec").c_str(), "w");
+                FILE* f2 = fopen(("../data/" + dataSet + "Output/relation2vec" + note + "_" + to_string(epoch) + ".vec").c_str(), "w");
+                FILE* f3 = fopen(("../data/" + dataSet + "Output/entity2vec" + note + "_" + to_string(epoch) + ".vec").c_str(), "w");
+                FILE* f4 = fopen(("../data/" + dataSet + "Output/concept2vec" + note + "_" + to_string(epoch) + ".vec").c_str(), "w");
                 for (int i=0; i<relation_num; i++)
                 {
                     for (int ii=0; ii<n; ii++)
@@ -901,6 +901,7 @@ private:
         double pos_x = gradientPositiveInstanceOf(e_a, c_a, false, 0);
         double neg_x = gradientNegativeInstanceOf(e_b, c_b, false, 0);
 
+/*
         if(OWL && corrupt && eq_cls.size() > 0) {
 			int i = 0;
 			for(set<int>::iterator it = eq_cls.begin(); it != eq_cls.end(); ++it) {
@@ -911,7 +912,7 @@ private:
                 gradientNegativeInstanceOf(e_b, tail, true, neg_x);
 				i++;
 			}
-		}
+		}*/
     }
 
     double gradientPositiveInstanceOf(int e_a, int c_a, bool gradient, double dis) {
@@ -1075,7 +1076,7 @@ void OWLinit(map<string,int> rel2id, map<string,int> class2id) {
     domain_file.close();
 
     ifstream range_file("../data/" + dataSet + "Train/rs_range2id.txt");
-    getline(domain_file, tmp);
+    getline(range_file, tmp);
     while (getline(range_file, tmp)) {
         string::size_type pos=tmp.find(' ',0);
     	int relation= atoi(tmp.substr(0,pos).c_str());
@@ -1318,6 +1319,10 @@ int main(int argc, char** argv){
         cout << "bern = " << "True" << endl;
     else
         cout << "bern = " << "False" << endl;
+    if (OWL)
+        cout << "OWL = " << "True" << endl;
+    else
+        cout << "OWL = " << "False" << endl;
     prepare();
     train.setup(n, rate, margin, margin_ins, margin_sub);
 	if (loadPath) train.load();
