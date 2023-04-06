@@ -14,10 +14,13 @@ using namespace std;
 
 int dim = 100, sub_test_num = 0, ins_test_num = 0, concept_num = 0, entity_num = 0;
 double delta_ins = 0, delta_sub = 0;
-bool valid = true;
+bool valid;
 bool mix = false;
 bool OWL = false;
-string dataSet = "DBpedia15K";
+int epoca_attuale = 0;
+int epoche = -1;
+FILE* results;
+string dataSet = "DBpedia100K";
 
 vector<vector<double> > entity_vec, concept_vec;
 vector<double> concept_r;
@@ -66,10 +69,6 @@ string note = "";
 void prepare(){
     init();
 
-    if(OWL) {
-        note = "_OWL";
-    }
-
     ifstream fin, fin_right;
     if(valid){
         fin.open(("../data/" + dataSet + "/Valid/falseinstanceOf2id.txt").c_str());
@@ -99,8 +98,17 @@ void prepare(){
     tmp = fscanf(fin_num, "%d", &concept_num);
     fclose(fin_num);
 
-    FILE* f1 = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + ".vec").c_str(), "r");
-    FILE* f2 = fopen(("../data/" + dataSet + "/Output/concept2vec" + note + ".vec").c_str(), "r");
+    FILE* f1;
+    FILE* f2;
+    if(epoche == -1) {
+        f1 = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + ".vec").c_str(), "r");
+        f2 = fopen(("../data/" + dataSet + "/Output/concept2vec" + note + ".vec").c_str(), "r");
+    } else {
+        f1 = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + "_" + to_string(epoca_attuale) + ".vec").c_str(), "r");
+        f2 = fopen(("../data/" + dataSet + "/Output/relation2vec" + note + "_" + to_string(epoca_attuale) + ".vec").c_str(), "r");
+    }
+
+    
     entity_vec.resize(entity_num);
     for(int i = 0; i < entity_num; ++i){
         entity_vec[i].resize(dim);
@@ -167,28 +175,17 @@ pair<double, double> test(){
         double sub_ins = (TP_sub + TN_sub) * 100 / (TP_sub + TN_sub + FN_sub + FP_sub);
         return make_pair(ins_ans, sub_ins);
     }else{
-        cout << "instanceOf triple classification:" << endl;
-        cout << "accuracy: " << (TP_ins + TN_ins) * 100 / (TP_ins + TN_ins + FN_ins + FP_ins) << "%" << endl;
-        cout << "precision: " << TP_ins * 100 /(TP_ins + FP_ins) << "%" << endl;
-        cout << "recall: " << TP_ins * 100 / (TP_ins + FN_ins) << "%" << endl;
-        double p = TP_ins * 100 /(TP_ins + FP_ins), r = TP_ins * 100 / (TP_ins + FN_ins);
-        cout << "FPR: " << FP_ins / (FP_ins + TN_ins) << "%" << endl;
-        cout << endl;
-        
+        double accuracy = (TP_ins + TN_ins) * 100 / (TP_ins + TN_ins + FP_ins + FN_ins);
+        double precision = TP_ins * 100 /(TP_ins + FP_ins);
+        double recall = TP_ins * 100 / (TP_ins + FN_ins);
+        double FPR = FP_ins * 100 /(FP_ins + TN_ins);
 
-        for(set<double>::iterator iter = concept_set.begin(); iter != concept_set.end(); ++iter){
-            int index = *iter;
-            TP_ins = TP_ins_map[index];
-            TN_ins = TN_ins_map[index];
-            FN_ins = FN_ins_map[index];
-            FP_ins = FP_ins_map[index];
-            double accuracy = (TP_ins + TN_ins) * 100 / (TP_ins + TN_ins + FN_ins + FP_ins);
-            double precision = TP_ins * 100 /(TP_ins + FP_ins);
-            double recall = TP_ins * 100 / (TP_ins + FN_ins);
-            p = TP_ins * 100 /(TP_ins + FP_ins);
-            r = TP_ins * 100 / (TP_ins + FN_ins);
-            double f1 = 2 * p * r / (p + r);
-        }
+        fprintf(results,"%d,", epoca_attuale);
+        fprintf(results,"%f,", accuracy);
+        fprintf(results,"%f,", precision);
+        fprintf(results,"%f,", recall);
+        fprintf(results,"%f\n", FPR);
+
         return make_pair(0.0, 0.0);
     }
 }
@@ -205,8 +202,6 @@ void runValid(){
             ins_best_delta = f;
         }
     }
-    cout << "delta_ins is " << ins_best_delta << ". The best ins accuracy on valid data is " << ins_best_answer << "%" << endl;
-    cout << endl;
     delta_ins = ins_best_delta;
     valid = false;
     prepare();
@@ -230,12 +225,36 @@ int main(int argc, char**argv){
     if ((i = ArgPos((char *)"-data", argc, argv)) > 0) dataSet = argv[i + 1];
     if ((i = ArgPos((char *)"-mix", argc, argv)) > 0) mix = static_cast<bool>(atoi(argv[i + 1]));
     if ((i = ArgPos((char *)"-dim", argc, argv)) > 0) dim = atoi(argv[i + 1]);
+    if ((i = ArgPos((char *)"-OWL", argc, argv)) > 0) OWL = static_cast<bool>(atoi(argv[i + 1]));
+    if ((i = ArgPos((char *)"-epoche", argc, argv)) > 0) epoche = atoi(argv[i + 1]);
     cout << "data = " << dataSet << endl;
     if (mix)
         cout << "mix = " << "True" << endl;
     else
         cout << "mix = " << "False" << endl;
+        if (OWL)
+        cout << "OWL = " << "True" << endl;
+    else
+        cout << "OWL = " << "False" << endl;
+
+    if(OWL) {
+        note = "_OWL";
+    }
     cout << "dimension = " << dim << endl;
-    prepare();
-    runValid();
+
+    results = fopen(("../data/" + dataSet + "/Output/results" + note + "_typeof.csv").c_str(), "w");
+    fprintf(results,"Epoca,Accuracy,Precision,Recall,FPR\n");
+
+    if(epoche == -1) {   
+        valid = true;     
+        prepare();
+        runValid();
+    } else {
+        for(epoca_attuale = 0; epoca_attuale <= epoche; epoca_attuale += 100)
+        {
+            valid = true;
+            prepare();
+            runValid();
+        }
+    }
 }

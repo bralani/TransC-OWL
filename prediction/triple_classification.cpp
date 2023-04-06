@@ -11,10 +11,13 @@ using namespace std;
 
 int dim = 100;
 int test_num = 0, relation_num = 0, valid_num = 0, entity_num = 0;
+int epoca_attuale = 0;
+int epoche = -1;
 bool OWL = false;
-string dataSet = "DBpedia15K";
-bool valid = true;
+string dataSet = "DBpedia100K";
+bool valid;
 bool getMinMax = false;
+FILE* results;
 
 vector<double> delta_relation;
 vector<pair<double, double> > max_min_relation;
@@ -53,10 +56,6 @@ string note = "";
 
 void prepare(bool final_test = false){
     init();
-
-    if(OWL) {
-        note = "_OWL";
-    }
     
     ifstream fin, fin_right;
     if(valid){
@@ -105,8 +104,15 @@ void prepare(bool final_test = false){
     }
     fin.close(); fin_right.close();
 
-    FILE* f1 = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + ".vec").c_str(), "r");
-    FILE* f2 = fopen(("../data/" + dataSet + "/Output/relation2vec" + note + ".vec").c_str(), "r");
+    FILE* f1;
+    FILE* f2;
+    if(epoche == -1) {
+        f1 = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + ".vec").c_str(), "r");
+        f2 = fopen(("../data/" + dataSet + "/Output/relation2vec" + note + ".vec").c_str(), "r");
+    } else {
+        f1 = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + "_" + to_string(epoca_attuale) + ".vec").c_str(), "r");
+        f2 = fopen(("../data/" + dataSet + "/Output/relation2vec" + note + "_" + to_string(epoca_attuale) + ".vec").c_str(), "r");
+    }
     entity_vec.resize(entity_num);
     for(int i = 0; i < entity_num; ++i){
         entity_vec[i].resize(dim);
@@ -159,13 +165,17 @@ vector<double> test(){
         }
         return returnAns;
     }else{
-        cout << "Triple classification:" << endl;
-        cout << "accuracy: " << (TP + TN) * 100 / (TP + TN + FP + FN) << "%" << endl;
-        cout << "precision: " << TP * 100 /(TP + FP) << "%" << endl;
-        cout << "recall: " << TP * 100 / (TP + FN) << "%" << endl;
-        double p = TP * 100 /(TP + FP), r = TP * 100 / (TP + FN);
-        cout << "FPR: " << FP / (FP + TN) << "%" << endl;
-        cout << endl;
+        double accuracy = (TP + TN) * 100 / (TP + TN + FP + FN);
+        double precision = TP * 100 /(TP + FP);
+        double recall = TP * 100 / (TP + FN);
+        double FPR = FP * 100 /(FP + TN);
+
+        fprintf(results,"%d,", epoca_attuale);
+        fprintf(results,"%f,", accuracy);
+        fprintf(results,"%f,", precision);
+        fprintf(results,"%f,", recall);
+        fprintf(results,"%f\n", FPR);
+
         vector<double> tmp;
         return tmp;
     }
@@ -218,8 +228,34 @@ int main(int argc, char** argv){
     int i = 0;
     if ((i = ArgPos((char *)"-data", argc, argv)) > 0) dataSet = argv[i + 1];
     if ((i = ArgPos((char *)"-dim", argc, argv)) > 0) dim = atoi(argv[i + 1]);
+    if ((i = ArgPos((char *)"-OWL", argc, argv)) > 0) OWL = static_cast<bool>(atoi(argv[i + 1]));
+    if ((i = ArgPos((char *)"-epoche", argc, argv)) > 0) epoche = atoi(argv[i + 1]);
     cout << "data = " << dataSet << endl;
     cout << "dimension = " << dim << endl;
-    prepare();
-    runValid();
+    if (OWL)
+        cout << "OWL = " << "True" << endl;
+    else
+        cout << "OWL = " << "False" << endl;
+
+    if(OWL) {
+        note = "_OWL";
+    }
+
+    results = fopen(("../data/" + dataSet + "/Output/results" + note + ".csv").c_str(), "w");
+    fprintf(results,"Epoca,Accuracy,Precision,Recall,FPR\n");
+
+    if(epoche == -1) {   
+        valid = true;     
+        prepare();
+        runValid();
+    } else {
+        for(epoca_attuale = 0; epoca_attuale <= epoche; epoca_attuale += 100)
+        {
+            valid = true;
+            prepare();
+            runValid();
+        }
+    }
+
+    fclose(results);
 }
