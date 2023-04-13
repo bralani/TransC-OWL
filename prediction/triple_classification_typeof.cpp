@@ -105,7 +105,7 @@ void prepare(){
         f2 = fopen(("../data/" + dataSet + "/Output/concept2vec" + note + ".vec").c_str(), "r");
     } else {
         f1 = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + "_" + to_string(epoca_attuale) + ".vec").c_str(), "r");
-        f2 = fopen(("../data/" + dataSet + "/Output/relation2vec" + note + "_" + to_string(epoca_attuale) + ".vec").c_str(), "r");
+        f2 = fopen(("../data/" + dataSet + "/Output/concept2vec" + note + "_" + to_string(epoca_attuale) + ".vec").c_str(), "r");
     }
 
     
