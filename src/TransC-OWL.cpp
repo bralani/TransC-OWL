@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <map>
 #include <fstream>
 #include <list>
 #include <set>
@@ -26,6 +25,7 @@ using namespace std;
 
 bool OWL = true;                 // indica se far partire l'algoritmo transC-OWL o transC
 bool loadPath = false;            // indica se caricare i vettori già addestrati
+int epoca_iniziale = 0;
 
 string note = "";
 const string typeOf = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>";
@@ -42,7 +42,7 @@ bool L1Flag = true;
 bool bern = false;
 double ins_cut = 8.0;
 double sub_cut = 8.0;
-string dataSet = "DBpedia100K/";
+string dataSet = "DBpediaYAGO/";
 
 double rand(double min, double max){
     return min + (max - min) * rand() / (RAND_MAX + 1.0);
@@ -179,21 +179,21 @@ public:
     {
         FILE *fin;
         int tmp;
-        fin = fopen(("../data/" + dataSet + "Output/entity2vec" + note + ".vec").c_str(), "r");
+        fin = fopen(("../data/" + dataSet + "Output/entity2vec" + note + "_" + to_string(epoca_iniziale) + ".vec").c_str(), "r");
         for (int i = 0; i < entity_num; i++)
         {
             for (int j = 0; j < n; j++)
                 tmp = fscanf(fin, "%lf", &entity_vec[i][j]);
         }
         fclose(fin);
-        fin = fopen(("../data/" + dataSet + "Output/relation2vec" + note + ".vec").c_str(), "r");
+        fin = fopen(("../data/" + dataSet + "Output/relation2vec" + note + "_" + to_string(epoca_iniziale) + ".vec").c_str(), "r");
         for (int i = 0; i < relation_num; i++)
         {
             for (int j = 0; j < n; j++)
                 tmp = fscanf(fin, "%lf", &relation_vec[i][j]);
         }
         fclose(fin);
-        fin = fopen(("../data/" + dataSet + "Output/concept2vec" + note + ".vec").c_str(), "r");
+        fin = fopen(("../data/" + dataSet + "Output/concept2vec" + note + "_" + to_string(epoca_iniziale) + ".vec").c_str(), "r");
         for (int i = 0; i < concept_num; i++) {
             for (int j = 0; j < n; j++)
                 tmp = fscanf(fin, "%lf", &concept_vec[i][j]);
@@ -276,7 +276,7 @@ public:
         int nbatches=100;
         int nepoch = 10000;
         int batchSize = trainSize/nbatches;
-        for(int epoch = 0; epoch < nepoch; ++epoch){
+        for(int epoch = epoca_iniziale; epoch < nepoch; ++epoch){
             res = 0;
             for(int batch = 0; batch < nbatches; ++batch){
                 relation_tmp = relation_vec;
@@ -821,7 +821,7 @@ private:
             entity_tmp[e1_a][ii]-=-1*rate*x;
             entity_tmp[e2_a][ii]+=-1*rate*x;
 
-            relation_tmp[inverseRel][ii]-=-1*rate*x;
+            relation_tmp[inverseRel][ii]+=-1*rate*x;
             entity_tmp[e2_a][ii]-=-1*rate*x;
             entity_tmp[e1_a][ii]+=-1*rate*x;
 
@@ -839,7 +839,7 @@ private:
             entity_tmp[e1_b][ii]-=rate*x;
             entity_tmp[e2_b][ii]+=rate*x;
 
-            relation_tmp[inverseRel][ii]-=rate*x;
+            relation_tmp[inverseRel][ii]+=rate*x;
             entity_tmp[e2_b][ii]-=rate*x;
             entity_tmp[e1_b][ii]+=rate*x;
 
@@ -998,7 +998,7 @@ void OWLinit(map<string,int> rel2id, map<string,int> class2id) {
 	ifstream inverse_file("../data/" + dataSet + "Train/inverseOf.txt");
 	while (getline(inverse_file, tmp))
 	{
-		string::size_type pos = tmp.find('\t', 0);
+		string::size_type pos = tmp.find(' ', 0);
 		string first = tmp.substr(0, pos);
 		if (rel2id.find(first) != rel2id.end())
 		{

@@ -10,9 +10,9 @@ import os
 import random
 
 # variabili da modificare
-path_dataset = '/home/matteo/Desktop/TransC-OWL/data/'
-dataset = 'DBpedia15K/'
-typeof_id = 275
+path_dataset = 'D:/TransC-OWL/data/'
+dataset = 'DBpediaYAGO/'
+typeof_id = 0
 
 train_perc = 0.7
 valid_perc = 0.15
@@ -29,6 +29,8 @@ instanceof2id = []
 falseinstanceof2id = []
 subclassof2id = []
 inverseOf2 = []
+rs_domain2id = []
+rs_range2id = []
 
 
 def carica_file(file, reverse = False):
@@ -37,7 +39,7 @@ def carica_file(file, reverse = False):
     else:
         str_command = "[riga[0]] = int(riga[1])"
 
-    file_in = open(path_dataset + dataset + file + '.txt', 'r')
+    file_in = open(path_dataset + dataset + file + '.txt', 'r', encoding='utf-8')
     # salta la prima riga
     first_line = True
     for line in file_in:
@@ -51,12 +53,15 @@ def carica_file(file, reverse = False):
 print('Caricamento file...')
 carica_file('entity2id', True)
 carica_file('relation2id')
-carica_file('instance2id')
+#carica_file('instance2id')
 carica_file('class2id')
 print('file caricati con successo')
 
+for key, value in entity2id.items():
+    if value not in instance2id and value not in class2id:
+        instance2id[value] = len(instance2id) + 1
 
-file_in = open(path_dataset + dataset + 'instanceof.txt', 'r')
+file_in = open(path_dataset + dataset + 'instanceof.txt', 'r', encoding='utf-8')
 for line in file_in:
     x=line.split()
     triple=[]
@@ -65,10 +70,10 @@ for line in file_in:
     concept = x[1]
     
     if instance not in instance2id:
-        instance2id[instance] = len(instance2id)
+        instance2id[instance] = len(instance2id) + 1
 
     if concept not in class2id:
-        class2id[concept] = len(class2id)
+        class2id[concept] = len(class2id) + 1
 
 
     instanceof2id.append([str(instance2id[instance]), str(class2id[concept])])
@@ -89,7 +94,7 @@ for line in file_in:
         falseinstanceof2id.append([str(instance), str(concept)])
     
 
-file_in = open(path_dataset + dataset + 'subclassof.txt', 'r')
+file_in = open(path_dataset + dataset + 'subclassof.txt', 'r', encoding='utf-8')
 for line in file_in:
     x=line.split()
     triple=[]
@@ -98,54 +103,40 @@ for line in file_in:
     concept_up = x[1]
 
     if concept_sub not in class2id:
-        class2id[concept_sub] = len(class2id)
+        class2id[concept_sub] = len(class2id) + 1
 
     if concept_up not in class2id:
-        class2id[concept_up] = len(class2id)
+        class2id[concept_up] = len(class2id) + 1
     
     subclassof2id.append([str(class2id[concept_sub]), str(class2id[concept_up])])
 
 
-scartate = 0
-file_in = open(path_dataset + dataset + 'triples.txt', 'r')
+
+file_in = open(path_dataset + dataset + 'rs_domain.txt', 'r', encoding='utf-8')
 for line in file_in:
     x=line.split()
     triple=[]
 
-    head = x[0]
-    relation = x[1]
-    tail = x[2]
+    relation = x[0]
+    concept = x[1]
     
-    # ignora le typeof
-    if relation2id[relation] != typeof_id:
-        # scarta tutte le triple che non hanno sia head che tail nell'instance2id
-        if head in instance2id and tail in instance2id:
-            triple.append(str(instance2id[head]))
-            triple.append(str(instance2id[tail]))
-            triple.append(str(relation2id[relation]))
-            triples.append(triple)
-        else:
-            scartate += 1
-            
-file_in = open(path_dataset + dataset + 'inverseOf.txt', 'r')
+    if concept in class2id and relation in relation2id:
+        rs_domain2id.append([str(relation2id[relation]), str(class2id[concept])])
+
+file_in = open(path_dataset + dataset + 'rs_range.txt', 'r', encoding='utf-8')
 for line in file_in:
     x=line.split()
     triple=[]
 
-    head = x[0]
-    relation = x[1]
-    tail = x[2]
+    relation = x[0]
+    concept = x[1]
     
-    # ignora le typeof
-    if relation2id[relation] != typeof_id:
-        # scarta tutte le triple che non hanno sia head che tail nell'instance2id
-        if head in instance2id and tail in instance2id:
-            triple.append(str(instance2id[head]))
-            triple.append(str(instance2id[tail]))
-            triple.append(str(relation2id[relation]))
-            triples.append(triple)
+    if concept in class2id and relation in relation2id:
+        rs_range2id.append([str(relation2id[relation]), str(class2id[concept])])
+        
+        
 
-file_in = open(path_dataset + dataset + 'false2id.txt', 'r')
+file_in = open(path_dataset + dataset + 'false2id.txt', 'r', encoding='utf-8')
 for line in file_in:
     x=line.split()
     triple=[]
@@ -159,8 +150,6 @@ for line in file_in:
         tail = instance2id[tail]
         
         false2id.append([str(head), str(tail), str(relation)])
-
-print('Scartate ' + str(scartate) + ' triple')
 
 
 # genera il training set, validation set e test set
@@ -196,17 +185,13 @@ def suddividi_set(set, no_training = False):
 def salva_file(file, folder, set):
     if not os.path.exists(path_dataset + dataset + folder):
         os.makedirs(path_dataset + dataset + folder)
-    file_out = open(path_dataset + dataset + folder + '/' + file + '.txt', 'w')
+    file_out = open(path_dataset + dataset + folder + '/' + file + '.txt', 'w', encoding='utf-8')
     file_out.write(str(len(set))  + '\n')
     for triple in set:
         file_out.write(' '.join(triple) + '\n')
 
 # salva i file
 print('Salvataggio file...')
-training_set, validation_set, test_set = suddividi_set(triples)
-salva_file('train2id', 'Train', training_set)
-salva_file('valid2id', 'Valid', validation_set)
-salva_file('test2id', 'Test', test_set)
 
 training_set, validation_set, test_set = suddividi_set(false2id, True)
 salva_file('valid2id_false', 'Valid', validation_set)
@@ -222,26 +207,26 @@ salva_file('falseinstanceOf2id', 'Train', training_set)
 salva_file('falseinstanceOf2id', 'Valid', validation_set)
 salva_file('falseinstanceOf2id', 'Test', test_set)
 
-training_set, validation_set, test_set = suddividi_set(subclassof2id)
-salva_file('subclassOf2id', 'Train', training_set)
-salva_file('subclassOf2id', 'Valid', validation_set)
-salva_file('subclassOf2id', 'Test', test_set)
+
+salva_file('subclassOf2id', 'Train', subclassof2id)
+salva_file('rs_domain2id', 'Train', rs_domain2id)
+salva_file('rs_range2id', 'Train', rs_range2id)
 
 
 # salva i file instance2id.txt, class2id.txt, relation2id.txt
-file_out = open(path_dataset + dataset + 'Train/instance2id.txt', 'w')
-file_out.write(str(len(instance2id))  + '\n')
+file_out = open(path_dataset + dataset + 'Train/instance2id.txt', 'w', encoding='utf-8')
+file_out.write(str(len(instance2id) + 1 )  + '\n')
 for key, value in instance2id.items():
     file_out.write(key + ' ' + str(value) + '\n')
 
 
-file_out = open(path_dataset + dataset + 'Train/class2id.txt', 'w')
-file_out.write(str(len(class2id))  + '\n')
+file_out = open(path_dataset + dataset + 'Train/class2id.txt', 'w', encoding='utf-8')
+file_out.write(str(len(class2id) + 1)  + '\n')
 for key, value in class2id.items():
     file_out.write(key + ' ' + str(value) + '\n')
 
 
-file_out = open(path_dataset + dataset + 'Train/relation2id.txt', 'w')
-file_out.write(str(len(relation2id))  + '\n')
+file_out = open(path_dataset + dataset + 'Train/relation2id.txt', 'w', encoding='utf-8')
+file_out.write(str(len(relation2id) + 1)  + '\n')
 for key, value in relation2id.items():
     file_out.write(key + ' ' + str(value) + '\n')
