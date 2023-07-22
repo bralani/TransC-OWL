@@ -18,6 +18,7 @@ long dimension = 100;
 long testTotal, tripleTotal, trainTotal, validTotal;
 long testTotalR[1500];
 float *entityVec, *relationVec, *entityRelVec, *matrix;
+bool OWL = true;
 string dataSet = "Nell";
 
 struct Triple {
@@ -41,7 +42,6 @@ bool cmp(Mix a, Mix b){
 
 Triple *testList, *tripleList;
 
-bool OWL = true;
 string note = "";
 
 void init() {
@@ -133,14 +133,14 @@ void* prepareMode(void *con) {
 void prepare() {
     FILE *fin;
     long tmp;
-    fin = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + ".vec").c_str(), "r");
+    fin = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + "_1900.vec").c_str(), "r");
     for (long i = 0; i < entityTotal; i++) {
         long last = i * dimension;
         for (long j = 0; j < dimension; j++)
             tmp = fscanf(fin, "%f", &entityVec[last + j]);
     }
     fclose(fin);
-    fin = fopen(("../data/" + dataSet + "/Output/relation2vec" + note + ".vec").c_str(), "r");
+    fin = fopen(("../data/" + dataSet + "/Output/relation2vec" + note + "_1900.vec").c_str(), "r");
     for (long i = 0; i < relationTotal; i++) {
         long last = i * dimension;
         for (long j = 0; j < dimension; j++)

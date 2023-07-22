@@ -16,83 +16,99 @@ int dim = 50, ins_test_num = 0, ins_test_num_false = 0, concept_num = 0, entity_
 double threshold_typeof = 0, delta_sub = 0;
 bool valid;
 bool mix = false;
-int epoca_attuale = 5;
-int epoche = 201;
+int epoca_attuale = 0;
+int epoche = 100;
 FILE* results;
-string dataSet = "DBpedia15K";
+string dataSet = "Nell";
 map<string, string> class_map;
 map<string, string> entity_map;
 map<string, string> relation_map;
 
 
-vector<vector<double> > entity_vec, class_mu, class_covariance;
+vector<vector<double> > entity_vec, class_mu;
+vector<vector<vector<double>> > class_cholesky, class_covariance;
+vector<double> concept_r;
 vector<pair<int, int> > ins_right, ins_wrong, sub_right, sub_wrong;
 
 inline double sqr(double x){
     return x * x;
 }
 
+void calculateCovarianceMatrix() {
+    for (int l = 0; l < concept_num; ++l) {
+        // Calcola la matrice di covarianza
+        for (int i = 0; i < dim; i++) {
+            for (int j = 0; j <= i; j++) {
+                double covariance = 0.0;
+                for (int k = i; k < dim; k++) {
+                    covariance += class_cholesky[l][k][i] * class_cholesky[l][k][j];
+                }
+                class_covariance[l][i][j] = covariance;
+                class_covariance[l][j][i] = covariance;
+            }
+        }
 
-#include <iostream>
-#include <vector>
-#define M_PI 3.14159265358979323846
-
-double log_prob_diagonale(vector<double>& x, vector<double>& mean, vector<double>& var) {
-    double log_prob = 0.0;
-
-    for (int i = 0; i < dim; i++) {
-        double xi = x[i];
-        double mean_i = mean[i];
-        double diff = xi - mean_i;
-        double var_i = var[i];
-
-        // Calcola la log-probabilità per la variabile i-esima
-        double log_prob_i = -0.5 * log(2 * M_PI * var_i) - 0.5 * (diff * diff) / var_i;
-
-        // Aggiungi la log-probabilità alla somma totale
-        log_prob += log_prob_i;
     }
-
-    return log_prob;
 }
-/*
-bool checkInstance(int instance, int concept){
+
+bool checkSubclassOf(int instance, int concept){
     
-    // Calcola la probabilità di una distribuzione normale gaussiana multivariata
-    double probability = log_prob_diagonale(entity_vec[instance], class_mu[concept], class_covariance[concept]);
-    if(probability > threshold_typeof) {
-        return true;
-    } else {
-        return false;
-    }
-}*/
+    // Calcolo delle matrici di covarianza inverse (precision matrices)
+    double invCov1[dim][dim];
+    double invCov2[dim][dim];
 
+    // Calcolo l'inversa delle matrici di covarianza
+    // Puoi utilizzare un metodo come la decomposizione di Cholesky o Gauss-Jordan per calcolare l'inversa
 
-double mahalanobis_distance(vector<double>& x, vector<double>& mean, vector<double>& var) {
-    double distance = 0.0;
-    for (size_t i = 0; i < x.size(); i++)
+    // Calcolo della divergenza KL
+    double kl = 0.0;
+
+    // Calcolo del termine tr(Sigma_q^(-1) * Sigma_p)
+    for (int i = 0; i < dim; ++i)
     {
-        float centered_point = x[i] - mean[i];
-        float inv_covariance = 1.0 / var[i];
-        distance += centered_point * centered_point * inv_covariance;
+        for (int j = 0; j < dim; ++j)
+        {
+            kl += invCov2[i][j] * cov1[j][i];
+        }
     }
-    distance = sqrt(distance);
 
-    double sum = 0.0;
-    for(int i = 0; i < dim; ++i){
-        sum += var[i];
+    // Calcolo del termine (mu_q - mu_p)' * Sigma_q^(-1) * (mu_q - mu_p)
+    double diffMean[dimension];
+    for (int i = 0; i < dimension; ++i)
+    {
+        diffMean[i] = mean2[i] - mean1[i];
     }
-    return distance / sqrt(sum);
-}
 
+    double prodMeanCov[dimension];
+    for (int i = 0; i < dimension; ++i)
+    {
+        prodMeanCov[i] = 0.0;
+        for (int j = 0; j < dimension; ++j)
+        {
+            prodMeanCov[i] += diffMean[j] * invCov2[j][i];
+        }
+    }
 
-bool checkInstance(int instance, int concept){
+    double term2 = 0.0;
+    for (int i = 0; i < dimension; ++i)
+    {
+        term2 += prodMeanCov[i] * diffMean[i];
+    }
+
+    // Calcolo del termine ln(det(Sigma_q)/det(Sigma_p))
+    double detCov1 = 0.0;
+    double detCov2 = 0.0;
+
+    // Calcolo dei determinanti delle matrici di covarianza
+    // Puoi utilizzare un metodo come la decomposizione di Cholesky o Gauss-Jordan per calcolare il determinante
+
+    double term3 = std::log(detCov2 / detCov1);
+
+    // Calcolo finale della divergenza KL
+    kl = 0.5 * (kl + term2 - dimension + term3);
     
-    double distance = mahalanobis_distance(entity_vec[instance], class_mu[concept], class_covariance[concept]);
-
-
-
-    if(distance < threshold_typeof) {
+    double mahalanobis = sqrt(distance);
+    if(mahalanobis < threshold_typeof){
         return true;
     } else {
         return false;
@@ -100,7 +116,7 @@ bool checkInstance(int instance, int concept){
 }
 
 void init(){
-    entity_vec.clear(); class_covariance.clear(), class_mu.clear();
+    entity_vec.clear(); class_cholesky.clear(); class_covariance.clear(), class_mu.clear();
     ins_right.clear(); ins_wrong.clear(); sub_right.clear(); sub_wrong.clear();
 }
 
@@ -111,11 +127,11 @@ void prepare(){
 
     ifstream fin, fin_right;
     if(valid){
-        fin.open(("../data/" + dataSet + "/Valid/falseinstanceOf2id.txt").c_str());
-        fin_right.open(("../data/" + dataSet + "/Valid/instanceOf2id.txt").c_str());
+        fin.open(("../data/" + dataSet + "/Train/.txt").c_str());
+        fin_right.open(("../data/" + dataSet + "/Train/subclassOf2id.txt").c_str());
     }else{
-        fin.open(("../data/" + dataSet + "/Test/falseinstanceOf2id.txt").c_str());
-        fin_right.open(("../data/" + dataSet + "/Test/instanceOf2id.txt").c_str());
+        fin.open(("../data/" + dataSet + "/Train/.txt").c_str());
+        fin_right.open(("../data/" + dataSet + "/Train/subclassOf2id.txt").c_str());
     }
     fin >> ins_test_num_false;
     fin_right >> ins_test_num;
@@ -152,11 +168,20 @@ void prepare(){
     concept_num++;
 	class2id_num.close();
 
+    class_cholesky.resize(concept_num);
     class_covariance.resize(concept_num);
     class_mu.resize(concept_num);
     for(int i = 0; i < concept_num; ++i){
+        class_cholesky[i].resize(dim);
         class_covariance[i].resize(dim);
         class_mu[i].resize(dim);
+        for(int j = 0; j < dim; ++j){
+            class_cholesky[i][j].resize(dim);
+            for(int k = 0; k < dim; ++k){
+                class_cholesky[i][j][k] = 0.0;
+            }
+            class_covariance[i][j].resize(dim);
+        }
     }
 
     ifstream class2id_file("../data/" + dataSet + "/Output/transprob/class_map.txt");
@@ -171,15 +196,19 @@ void prepare(){
 
         double tmp;
         int i = atoi(c1.c_str());
-        
         for(int j = 0; j < dim; ++j){
             fscanf(f2, "%lf", &tmp);
             class_mu[i][j] = tmp;
-
-            fscanf(f3, "%lf", &tmp);
-            class_covariance[i][j] = tmp;
+        }
+        for(int j = 0; j < dim; ++j){
+            for(int k = j; k < dim; ++k){
+                fscanf(f3, "%lf", &tmp);
+                class_cholesky[i][j][k] = tmp;
+            }
         }
 	}
+
+    calculateCovarianceMatrix();
 
     entity_num = 0;
 	ifstream entity2id_num("../data/" + dataSet + "/Output/transprob/entity_map.txt");
@@ -258,6 +287,7 @@ void prepare(){
     if(ins_right.size() < ins_test_num) {
         ins_test_num = ins_right.size();
     }
+    
 }
 
 pair<double, double> test(){
@@ -267,7 +297,7 @@ pair<double, double> test(){
     set<double> concept_set;
 
     for(int i = 0; i < ins_test_num; ++i){
-        if(checkInstance(ins_right[i].first, ins_right[i].second)) {
+        if(checkSubclassOf(ins_right[i].first, ins_right[i].second)) {
             TP_ins++;
             if(TP_ins_map.count(ins_right[i].second) > 0){
                 TP_ins_map[ins_right[i].second]++;
@@ -282,7 +312,7 @@ pair<double, double> test(){
                 FN_ins_map[ins_right[i].second] = 1;
             }
         }
-        if(!checkInstance(ins_wrong[i].first, ins_wrong[i].second)) {
+        if(!checkSubclassOf(ins_wrong[i].first, ins_wrong[i].second)) {
             TN_ins++;
             if(TN_ins_map.count(ins_wrong[i].second) > 0){
                 TN_ins_map[ins_wrong[i].second]++;
@@ -304,7 +334,7 @@ pair<double, double> test(){
     }
     
     if(valid){
-        double ins_ans = (TP_ins + TN_ins) * 100 / (TP_ins + TN_ins + FP_ins + FN_ins);
+        double ins_ans = (TP_ins + TN_ins) * 100 / (TP_ins + TN_ins + FN_ins + FP_ins);
         double sub_ins = (TP_sub + TN_sub) * 100 / (TP_sub + TN_sub + FN_sub + FP_sub);
         return make_pair(ins_ans, sub_ins);
     }else{
@@ -327,13 +357,13 @@ pair<double, double> test(){
 void runValid(){
     double ins_best_answer = 0, ins_best_delta = 0;
     double sub_best_answer = 0, sub_best_delta = 0;
-    
-    for(int i = 0; i <= 300; ++i){
-        threshold_typeof = i;
+    for(int i = 0; i < 50; ++i){
+        double f = i;
+        threshold_typeof = f;
         pair<double, double> ans = test();
         if(ans.first > ins_best_answer){
             ins_best_answer = ans.first;
-            ins_best_delta = threshold_typeof;
+            ins_best_delta = f;
         }
     }
     threshold_typeof = ins_best_delta;
@@ -375,7 +405,7 @@ int main(int argc, char**argv){
         prepare();
         runValid();
     } else {
-        for(epoca_attuale = 50; epoca_attuale <= epoche; epoca_attuale += 50)
+        for(epoca_attuale = 61; epoca_attuale <= epoche; epoca_attuale += 100)
         {
             valid = true;
             prepare();

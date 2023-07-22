@@ -12,7 +12,7 @@ using namespace std;
 int dim = 100;
 int test_num = 0, relation_num = 0, valid_num = 0, entity_num = 0;
 int epoca_attuale = 0;
-int epoche = -1;
+int epoche = 2000;
 bool OWL = false;
 string dataSet = "DBpedia100K";
 bool valid;
@@ -107,8 +107,8 @@ void prepare(bool final_test = false){
     FILE* f1;
     FILE* f2;
     if(epoche == -1) {
-        f1 = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + ".vec").c_str(), "r");
-        f2 = fopen(("../data/" + dataSet + "/Output/relation2vec" + note + ".vec").c_str(), "r");
+        f1 = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + "_2400.vec").c_str(), "r");
+        f2 = fopen(("../data/" + dataSet + "/Output/relation2vec" + note + "_2400.vec").c_str(), "r");
     } else {
         f1 = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + "_" + to_string(epoca_attuale) + ".vec").c_str(), "r");
         f2 = fopen(("../data/" + dataSet + "/Output/relation2vec" + note + "_" + to_string(epoca_attuale) + ".vec").c_str(), "r");
@@ -161,7 +161,7 @@ vector<double> test(){
         vector<double> returnAns;
         returnAns.resize(relation_num);
         for(int i = 0; i < relation_num; ++i){
-            returnAns[i] = (ans[i][0] + ans[i][2]) * 100 / (ans[i][0] + ans[i][1] + ans[i][2] + ans[i][3]);
+            returnAns[i] = (ans[i][0]) * 100 / (ans[i][0] + ans[i][3]);
         }
         return returnAns;
     }else{
@@ -249,7 +249,7 @@ int main(int argc, char** argv){
         prepare();
         runValid();
     } else {
-        for(epoca_attuale = 0; epoca_attuale <= epoche; epoca_attuale += 100)
+        for(epoca_attuale = 100; epoca_attuale <= epoche; epoca_attuale += 100)
         {
             valid = true;
             prepare();

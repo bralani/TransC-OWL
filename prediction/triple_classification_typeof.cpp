@@ -12,15 +12,15 @@
 using namespace std;
 
 
-int dim = 100, sub_test_num = 0, ins_test_num = 0, concept_num = 0, entity_num = 0;
+int dim = 100, ins_test_num = 0, ins_test_num_false = 0, concept_num = 0, entity_num = 0;
 double delta_ins = 0, delta_sub = 0;
 bool valid;
 bool mix = false;
 bool OWL = false;
 int epoca_attuale = 0;
-int epoche = -1;
+int epoche = 3500;
 FILE* results;
-string dataSet = "DBpedia100K";
+string dataSet = "Nell";
 
 vector<vector<double> > entity_vec, concept_vec;
 vector<double> concept_r;
@@ -30,31 +30,18 @@ inline double sqr(double x){
     return x * x;
 }
 
-bool checkSubClass(int concept1, int concept2){
-    double dis = 0;
-    for(int i = 0; i < dim; ++i){
-        dis += sqr(concept_vec[concept1][i] - concept_vec[concept2][i]);
-    }
-    if(sqrt(dis) < fabs(concept_r[concept1] - concept_r[concept2]) && concept_r[concept1] < concept_r[concept2]){
-        return true;
-    }
-    if(sqrt(dis) < concept_r[concept1] + concept_r[concept2]){
-        double tmp = (concept_r[concept1] + concept_r[concept2] - sqrt(dis)) / concept_r[concept1];
-        if(tmp > delta_sub)
-            return true;
-    }
-    return false;
-}
-
 bool checkInstance(int instance, int concept){
     double dis = 0;
     for(int i = 0; i < dim; ++i){
         dis += sqr(entity_vec[instance][i] - concept_vec[concept][i]);
     }
-    if(sqrt(dis) < concept_r[concept]){
+    double t = concept_r[concept];
+
+    if(sqrt(dis) < t){
         return true;
     }
-    double tmp = concept_r[concept] / sqrt(dis);
+    double tmp = t / sqrt(dis);
+
     return tmp > delta_ins;
 }
 
@@ -77,8 +64,13 @@ void prepare(){
         fin.open(("../data/" + dataSet + "/Test/falseinstanceOf2id.txt").c_str());
         fin_right.open(("../data/" + dataSet + "/Test/instanceOf2id.txt").c_str());
     }
-    fin >> ins_test_num;
+    fin >> ins_test_num_false;
     fin_right >> ins_test_num;
+
+    if(ins_test_num_false < ins_test_num) {
+        ins_test_num = ins_test_num_false;
+    }
+
     int tmp1, tmp2;
     for(int i = 0; i < ins_test_num; ++i){
         fin >> tmp1 >> tmp2;
@@ -88,7 +80,6 @@ void prepare(){
     }
     fin.close();
     fin_right.close();
-    sub_test_num = 0;
 
     int tmp = 0;
     FILE *fin_num = fopen(("../data/" + dataSet + "/Train/instance2id.txt").c_str(), "r");
@@ -101,8 +92,8 @@ void prepare(){
     FILE* f1;
     FILE* f2;
     if(epoche == -1) {
-        f1 = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + ".vec").c_str(), "r");
-        f2 = fopen(("../data/" + dataSet + "/Output/concept2vec" + note + ".vec").c_str(), "r");
+        f1 = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + "_2400.vec").c_str(), "r");
+        f2 = fopen(("../data/" + dataSet + "/Output/concept2vec" + note + "_2400.vec").c_str(), "r");
     } else {
         f1 = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + "_" + to_string(epoca_attuale) + ".vec").c_str(), "r");
         f2 = fopen(("../data/" + dataSet + "/Output/concept2vec" + note + "_" + to_string(epoca_attuale) + ".vec").c_str(), "r");
@@ -123,7 +114,9 @@ void prepare(){
         for(int j = 0; j < dim; ++j){
             fscanf(f2, "%lf", &concept_vec[i][j]);
         }
-        fscanf(f2, "%lf", &concept_r[i]);
+        double tmp;
+        fscanf(f2, "%lf", &tmp);
+        concept_r[i] = tmp;
     }
 }
 
@@ -189,6 +182,7 @@ pair<double, double> test(){
         return make_pair(0.0, 0.0);
     }
 }
+
 
 void runValid(){
     double ins_best_answer = 0, ins_best_delta = 0;

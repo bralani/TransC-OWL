@@ -12,9 +12,10 @@ using namespace std;
 
 int dim = 50;
 int test_num = 0, relation_num = 0, valid_num = 0, entity_num = 0;
-int epoca_attuale = 35;
-int epoche = 201;
-string dataSet = "DBpedia15K";
+int epoca_attuale = 95;
+int epoche = -1;
+bool OWL = false;
+string dataSet = "DBpedia100K";
 map<string, string> entity_map;
 bool valid;
 bool getMinMax = false;
@@ -55,7 +56,7 @@ void init(){
 
 string note = "";
 
-void prepare(bool final_test = false){
+void prepare(bool final_test, string i, string j, string k){
     init();
     
     ifstream fin, fin_right;
@@ -124,13 +125,12 @@ void prepare(bool final_test = false){
 
     FILE* f1;
     FILE* f2;
-    if(epoche == -1) {
-        f1 = fopen(("../data/" + dataSet + "/Output/transprob/entity2vec" + note + "_" +to_string(epoca_attuale) + ".txt").c_str(), "r");
-        f2 = fopen(("../data/" + dataSet + "/Output/transprob/relation2vec" + note + "_" +to_string(epoca_attuale) + ".txt").c_str(), "r");
-    } else {
-        f1 = fopen(("../data/" + dataSet + "/Output/transprob/entity2vec" + note + "_" + to_string(epoca_attuale) + ".txt").c_str(), "r");
-        f2 = fopen(("../data/" + dataSet + "/Output/transprob/relation2vec" + note + "_" + to_string(epoca_attuale) + ".txt").c_str(), "r");
-    }
+    string file1 = "../data/" + dataSet + "/Output/transprob/"+i+"/"+j+"/"+k+"/entity2vec.txt";
+    string file2 = "../data/" + dataSet + "/Output/transprob/"+i+"/"+j+"/"+k+"/relation2vec.txt";
+
+    cout << file1 << endl;
+    f1 = fopen(file1.c_str(), "r");
+    f2 = fopen(file2.c_str(), "r");
     
     if(f1 == NULL || f2 == NULL){
         cout << "File entity2vec or relation2vec not found!" << endl;
@@ -212,7 +212,7 @@ void prepare(bool final_test = false){
     
 }
 
-vector<double> test(){
+vector<double> test(string i1, string j1, string k1){
     double TP = 0, TN = 0, FP = 0, FN = 0;
     vector<vector<double> > ans;
     ans.resize(relation_num);
@@ -254,7 +254,7 @@ vector<double> test(){
         double recall = TP * 100 / (TP + FN);
         double FPR = FP * 100 /(FP + TN);
 
-        fprintf(results,"%d,", epoca_attuale);
+        fprintf(results,"%f,%f,%f,", stof(i1), stof(j1), stof(k1));
         fprintf(results,"%f,", accuracy);
         fprintf(results,"%f,", precision);
         fprintf(results,"%f,", recall);
@@ -265,9 +265,9 @@ vector<double> test(){
     }
 }
 
-void runValid(){
+void runValid(string i1, string j1, string k1){
     getMinMax = true;
-    test();
+    test(i1, j1, k1);
     getMinMax = false;
 
     vector<double> best_delta_relation, best_ans_relation;
@@ -280,7 +280,7 @@ void runValid(){
         for(int j = 0; j < relation_num; ++j){
             delta_relation[j] = max_min_relation[j].second + (max_min_relation[j].first - max_min_relation[j].second) * i / 100;
         }
-        vector<double> ans = test();
+        vector<double> ans = test(i1, j1, k1);
         for(int k = 0; k < relation_num; ++k){
             if(ans[k] > best_ans_relation[k]){
                 best_ans_relation[k] = ans[k];
@@ -292,8 +292,8 @@ void runValid(){
         delta_relation[i] = best_delta_relation[i];
     }
     valid = false;
-    prepare(true);
-    test();
+    prepare(true, i1, j1, k1);
+    test(i1, j1, k1);
 }
 
 int ArgPos(char *str, int argc, char **argv) {
@@ -315,20 +315,19 @@ int main(int argc, char** argv){
     if ((i = ArgPos((char *)"-epoche", argc, argv)) > 0) epoche = atoi(argv[i + 1]);
     cout << "data = " << dataSet << endl;
     cout << "dimension = " << dim << endl;
-    results = fopen(("../data/" + dataSet + "/Output/transprob/results" + note + ".csv").c_str(), "w");
+    results = fopen(("../data/" + dataSet + "/Output/transprob/results_grid" + note + ".csv").c_str(), "w");
     fprintf(results,"Epoca,Accuracy,Precision,Recall,FPR\n");
 
-    if(epoche == -1) {   
-        valid = true;     
-        prepare();
-        runValid();
-    } else {
-        for(epoca_attuale = 50; epoca_attuale <= epoche; epoca_attuale += 50)
-        {
-            valid = true;
-            prepare();
-            runValid();
+    vector<string> grid = {"10", "1", "0.1", "0.01", "0.001", "0.0001"};
+    for(int i = 0; i < 2; ++i){
+        for(int j=0; j <6; ++j) {
+            for(int k=0; k <6; ++k) {
+                valid = true;
+                prepare(false, grid[i], grid[j], grid[k]);
+                runValid(grid[i], grid[j], grid[k]);
+            }
         }
+        
     }
 
     fclose(results);

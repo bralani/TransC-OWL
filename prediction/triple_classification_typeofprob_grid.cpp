@@ -16,10 +16,9 @@ int dim = 50, ins_test_num = 0, ins_test_num_false = 0, concept_num = 0, entity_
 double threshold_typeof = 0, delta_sub = 0;
 bool valid;
 bool mix = false;
-int epoca_attuale = 5;
-int epoche = 201;
+int epoche = -1;
 FILE* results;
-string dataSet = "DBpedia15K";
+string dataSet = "DBpedia100K";
 map<string, string> class_map;
 map<string, string> entity_map;
 map<string, string> relation_map;
@@ -55,44 +54,12 @@ double log_prob_diagonale(vector<double>& x, vector<double>& mean, vector<double
 
     return log_prob;
 }
-/*
+
 bool checkInstance(int instance, int concept){
     
     // Calcola la probabilità di una distribuzione normale gaussiana multivariata
     double probability = log_prob_diagonale(entity_vec[instance], class_mu[concept], class_covariance[concept]);
     if(probability > threshold_typeof) {
-        return true;
-    } else {
-        return false;
-    }
-}*/
-
-
-double mahalanobis_distance(vector<double>& x, vector<double>& mean, vector<double>& var) {
-    double distance = 0.0;
-    for (size_t i = 0; i < x.size(); i++)
-    {
-        float centered_point = x[i] - mean[i];
-        float inv_covariance = 1.0 / var[i];
-        distance += centered_point * centered_point * inv_covariance;
-    }
-    distance = sqrt(distance);
-
-    double sum = 0.0;
-    for(int i = 0; i < dim; ++i){
-        sum += var[i];
-    }
-    return distance / sqrt(sum);
-}
-
-
-bool checkInstance(int instance, int concept){
-    
-    double distance = mahalanobis_distance(entity_vec[instance], class_mu[concept], class_covariance[concept]);
-
-
-
-    if(distance < threshold_typeof) {
         return true;
     } else {
         return false;
@@ -106,16 +73,16 @@ void init(){
 
 string note = "";
 
-void prepare(){
+void prepare(string i, string j, string k){
     init();
 
     ifstream fin, fin_right;
     if(valid){
-        fin.open(("../data/" + dataSet + "/Valid/falseinstanceOf2id.txt").c_str());
-        fin_right.open(("../data/" + dataSet + "/Valid/instanceOf2id.txt").c_str());
+        fin.open(("../data/" + dataSet + "/Train/grid_typeof.txt").c_str());
+        fin_right.open(("../data/" + dataSet + "/Train/grid_typeof.txt").c_str());
     }else{
-        fin.open(("../data/" + dataSet + "/Test/falseinstanceOf2id.txt").c_str());
-        fin_right.open(("../data/" + dataSet + "/Test/instanceOf2id.txt").c_str());
+        fin.open(("../data/" + dataSet + "/Train/grid_typeof.txt").c_str());
+        fin_right.open(("../data/" + dataSet + "/Train/grid_typeof.txt").c_str());
     }
     fin >> ins_test_num_false;
     fin_right >> ins_test_num;
@@ -124,14 +91,18 @@ void prepare(){
     FILE* f1;
     FILE* f2;
     FILE* f3;
-    f1 = fopen(("../data/" + dataSet + "/Output/transprob/entity2vec" + note + "_" + to_string(epoca_attuale) + ".txt").c_str(), "r");
-    f2 = fopen(("../data/" + dataSet + "/Output/transprob/classmu2vec" + note + "_" + to_string(epoca_attuale) + ".txt").c_str(), "r");
-    f3 = fopen(("../data/" + dataSet + "/Output/transprob/classcov2vec" + note + "_" + to_string(epoca_attuale) + ".txt").c_str(), "r");
+    string file1 = "../data/" + dataSet + "/Output/transprob/"+i+"/"+j+"/"+k+"/entity2vec.txt";
+    string file2 = "../data/" + dataSet + "/Output/transprob/"+i+"/"+j+"/"+k+"/classmu2vec.txt";
+    string file3 = "../data/" + dataSet + "/Output/transprob/"+i+"/"+j+"/"+k+"/classcov2vec.txt";
+    f1 = fopen(file1.c_str(), "r");
+    f2 = fopen(file2.c_str(), "r");
+    f3 = fopen(file3.c_str(), "r");
     if (f3 == NULL || f2 == NULL || f1 == NULL) {
         printf("Errore nell'apertura del file.\n");
         return; // Uscita con errore
     }
 
+    cout << file1 << endl;
 
     concept_num = 0;
     string tmp_str;
@@ -237,16 +208,11 @@ void prepare(){
     for(int i = 0; i < ins_test_num; ++i){
 
         fin >> tmp1 >> tmp2;
-
-        if(entity_map.count(to_string(tmp1)) && entity_map.count(to_string(tmp2))) {
-            ins_wrong.emplace_back(tmp1, tmp2);
-        }
+        ins_wrong.emplace_back(tmp1, tmp2);
         
         fin_right >> tmp1 >> tmp2;
 
-        if(entity_map.count(to_string(tmp1)) && entity_map.count(to_string(tmp2))) {
-            ins_right.emplace_back(tmp1, tmp2);
-        }
+        ins_right.emplace_back(tmp1, tmp2);
     }
     fin.close();
     fin_right.close();
@@ -260,7 +226,7 @@ void prepare(){
     }
 }
 
-pair<double, double> test(){
+pair<double, double> test(string i1, string j1, string k1){
     double TP_ins = 0, TN_ins = 0, FP_ins = 0, FN_ins = 0;
     double TP_sub = 0, TN_sub = 0, FP_sub = 0, FN_sub = 0;
     map<int, double> TP_ins_map, TN_ins_map, FP_ins_map, FN_ins_map;
@@ -304,7 +270,7 @@ pair<double, double> test(){
     }
     
     if(valid){
-        double ins_ans = (TP_ins + TN_ins) * 100 / (TP_ins + TN_ins + FP_ins + FN_ins);
+        double ins_ans = TP_ins;
         double sub_ins = (TP_sub + TN_sub) * 100 / (TP_sub + TN_sub + FN_sub + FP_sub);
         return make_pair(ins_ans, sub_ins);
     }else{
@@ -313,7 +279,7 @@ pair<double, double> test(){
         double recall = TP_ins * 100 / (TP_ins + FN_ins);
         double FPR = FP_ins * 100 /(FP_ins + TN_ins);
 
-        fprintf(results,"%d,", epoca_attuale);
+        fprintf(results,"%f,%f,%f,", stof(i1), stof(j1), stof(k1));
         fprintf(results,"%f,", accuracy);
         fprintf(results,"%f,", precision);
         fprintf(results,"%f,", recall);
@@ -324,13 +290,13 @@ pair<double, double> test(){
 }
 
 
-void runValid(){
+void runValid(string i1, string j1, string k1){
     double ins_best_answer = 0, ins_best_delta = 0;
     double sub_best_answer = 0, sub_best_delta = 0;
     
-    for(int i = 0; i <= 300; ++i){
-        threshold_typeof = i;
-        pair<double, double> ans = test();
+    for(int i = 1000; i <= 3000; ++i){
+        threshold_typeof = -i;
+        pair<double, double> ans = test(i1, j1, k1);
         if(ans.first > ins_best_answer){
             ins_best_answer = ans.first;
             ins_best_delta = threshold_typeof;
@@ -338,8 +304,8 @@ void runValid(){
     }
     threshold_typeof = ins_best_delta;
     valid = false;
-    prepare();
-    test();
+    prepare(i1, j1, k1);
+    test(i1, j1, k1);
 }
 
 int ArgPos(char *str, int argc, char **argv) {
@@ -367,19 +333,20 @@ int main(int argc, char**argv){
         cout << "mix = " << "False" << endl;
     cout << "dimension = " << dim << endl;
 
-    results = fopen(("../data/" + dataSet + "/Output/transprob/results" + note + "_typeof.csv").c_str(), "w");
+    results = fopen(("../data/" + dataSet + "/Output/transprob/results_typeof_grid" + note + ".csv").c_str(), "w");
     fprintf(results,"Epoca,Accuracy,Precision,Recall,FPR\n");
 
-    if(epoche == -1) {   
-        valid = true;     
-        prepare();
-        runValid();
-    } else {
-        for(epoca_attuale = 50; epoca_attuale <= epoche; epoca_attuale += 50)
-        {
-            valid = true;
-            prepare();
-            runValid();
+    vector<string> grid = {"10", "1", "0.1", "0.01", "0.001", "0.0001"};
+    for(int i = 1; i < 2; ++i){
+        for(int j=0; j <6; ++j) {
+            for(int k=0; k <6; ++k) {
+                valid = true;
+                prepare(grid[i], grid[j], grid[k]);
+                runValid(grid[i], grid[j], grid[k]);
+            }
         }
+        
     }
+
+    fclose(results);
 }

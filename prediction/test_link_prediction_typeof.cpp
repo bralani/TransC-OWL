@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <pthread.h>
 
 using namespace std;
 
@@ -20,7 +21,8 @@ long testTotal, tripleTotal, trainTotal, validTotal;
 float *entityVec, *relationVec, *matrix;
 vector<vector<double> > concept_vec;
 vector<double> concept_r;
-string dataSet = "DBpedia15K";
+bool OWL = true;
+string dataSet = "Nell";
 
 struct Triple {
     long h, r, t;
@@ -43,7 +45,6 @@ bool cmp(Mix a, Mix b){
 
 Triple *testList, *tripleList;
 
-bool OWL = false;
 string note = "";
 
 void init() {
@@ -114,14 +115,14 @@ void init() {
 void prepare() {
     FILE *fin;
     long tmp;
-    fin = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + ".vec").c_str(), "r");
+    fin = fopen(("../data/" + dataSet + "/Output/entity2vec" + note + "_1900.vec").c_str(), "r");
     for (long i = 0; i < entityTotal; i++) {
         long last = i * dimension;
         for (long j = 0; j < dimension; j++)
             tmp = fscanf(fin, "%f", &entityVec[last + j]);
     }
     fclose(fin);
-    fin = fopen(("../data/" + dataSet + "/Output/relation2vec" + note + ".vec").c_str(), "r");
+    fin = fopen(("../data/" + dataSet + "/Output/relation2vec" + note + "_1900.vec").c_str(), "r");
     for (long i = 0; i < relationTotal; i++) {
         long last = i * dimension;
         for (long j = 0; j < dimension; j++)
@@ -131,7 +132,7 @@ void prepare() {
 
     concept_vec.resize(conceptTotal);
     concept_r.resize(conceptTotal);
-    fin = fopen(("../data/" + dataSet + "/Output/concept2vec" + note + ".vec").c_str(), "r");
+    fin = fopen(("../data/" + dataSet + "/Output/concept2vec" + note + "_1900.vec").c_str(), "r");
     for (long i = 0; i < conceptTotal; i++) {
         concept_vec[i].resize(dimension);
         for(int j = 0; j < dimension; ++j){
@@ -196,7 +197,7 @@ void* testMode(void *con) {
                 float value = calcSum(j, t);
                 if (value < minimal) {
                     l_s += 1;
-                    if (not find(j, t))
+                    if (!find(j, t))
                         l_filter_s += 1;
                 }
             }
@@ -206,7 +207,7 @@ void* testMode(void *con) {
                 float value = calcSum(h, j);
                 if (value < minimal) {
                     r_s += 1;
-                    if (not find(h, j))
+                    if (!find(h, j))
                         r_filter_s += 1;
                 }
             }
